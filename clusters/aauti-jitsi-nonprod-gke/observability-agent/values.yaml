@@ -1,0 +1,95 @@
+# Observability agent on aauti-jitsi-nonprod-gke (namespace "observability-agent").
+# Chart: ../../../charts/observability-stack (spoke mode), layered on its
+# profiles/spoke.yaml. Ships to the hub aauti-hub-as1-obs-gke, tenant "jitsi".
+#
+# - Scope: every namespace of the cluster (logs + metrics + Kubernetes events).
+# - Labels on every series / log stream: cluster, environment, namespace, pod,
+#   container, node, app, job (+ log_type on logs).
+# - Transport: private only. hubUrl is the hub gateway's INTERNAL load balancer
+#   (10.40.16.10, subnet aauti-hub-vpc-as1-ingest-subnet), reached over the VPC
+#   peering jitsi-nonprod-to-hub / hub-to-jitsi-nonprod. Nothing is public.
+# - Security: TLS 1.2+ verified against the hub's private CA (Secret
+#   observability-hub-ca) with SNI observability-gateway.observability.svc,
+#   plus basic auth as tenant "jitsi" (Secret observability-agent-auth).
+#   Neither secret is stored in this repo; deploy.ps1 copies them from the hub.
+#
+# Tenant "jitsi" is shared by all Jitsi clusters; they are told apart by the
+# cluster / environment labels (prod will use environment: prod).
+
+cluster:
+  name: aauti-jitsi-nonprod-gke
+  tier: nonprod
+  # One Jitsi (devvideo.aauti.com) serves dev, qa, demo and sandbox; the
+  # environment is chosen per meeting via the room name
+  # (<title>-<entity>-aauti-<env>, recordings ...-recording-<env>). Pods, nodes
+  # and JVB load are therefore "shared"; log lines that name a room get the
+  # room's environment (agent.logs.environmentFromLine below).
+  environment: shared
+
+agent:
+  tenant: jitsi
+  # Standard for every cluster: environment from the namespace suffix
+  # (-dev / -qa / -demo / -sandbox / -uat / -staging), else cluster.environment.
+  environmentFromNamespace: { enabled: true }
+  hubUrl: https://10.40.16.10
+  auth:
+    existingSecret: true          # observability-agent-auth, created by deploy.ps1
+  tls:
+    # CA is passed at install time: --set-file agent.tls.caCert=<hub-ca.crt>
+    serverName: observability-gateway.observability.svc
+  namespaces: []                  # whole cluster
+  metrics:
+    scrapeInterval: 60s
+    annotatedPods: true           # JVB pods (prometheus.io/scrape, port 9888)
+    kubeStateMetrics: { enabled: true }       # this release's own instance
+    nodeExporter:
+      # Re-uses the node-exporter DaemonSet of the existing kube-prometheus-stack
+      # (namespace monitoring). Read-only scrape; nothing there is changed.
+      enabled: true
+      selector: app.kubernetes.io/name=prometheus-node-exporter
+    # Prosody (ServiceMonitor) and Jicofo (PodMonitor) have no scrape
+    # annotations; use the monitors the jitsi-meet chart already ships.
+    # JVB is skipped here because it is already scraped via its annotations.
+    prometheusOperator:
+      enabled: true
+      namespaces: [jitsi]
+      matchExpressions:
+        - { key: app.kubernetes.io/component, operator: NotIn, values: [jvb] }
+  logs:
+    method: api                   # single agent tails every pod via the API
+    events: true
+    defaultLogType: application
+    # Meeting environment from the line, as logged by every Jitsi component:
+    #   web      GET ... "https://devvideo.aauti.com/<id>-aauti-qa?..."
+    #   prosody  Room <id>-aauti-qa@muc.devvideo.aauti.com destroyed
+    #   jvb      conf_name=<id>-aauti-qa@muc... expire_conf,duration=364
+    #   jicofo   [room=<id>-aauti-qa@muc... meeting_id=...]
+    #   jibri    [finalize][qa][<id>][<session>] ... / <id>-recording-qa / aauti_<id>_recording_qa
+    environmentFromLine:
+      enabled: true
+      regex: '(?:-aauti-|[-_]recording[-_]|\[finalize\]\[)(?P<env>dev|qa|demo|sandbox|prod)\b'
+
+# One agent (StatefulSet) on the monitoring node pool. It tails logs through
+# the Kubernetes API, so it does not need to run on every (tainted) node.
+alloy:
+  controller:
+    type: statefulset
+    replicas: 1
+    nodeSelector: { cloud.google.com/gke-nodepool: monitoring }
+    tolerations:
+      - { key: workload, operator: Equal, value: monitoring, effect: NoSchedule }
+    volumeClaimTemplates:
+      - metadata: { name: alloy-data }
+        spec:
+          accessModes: [ReadWriteOnce]
+          storageClassName: standard-rwo
+          resources: { requests: { storage: 2Gi } }
+  alloy:
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 1Gi }
+
+kube-state-metrics:
+  nodeSelector: { cloud.google.com/gke-nodepool: monitoring }
+  tolerations:
+    - { key: workload, operator: Equal, value: monitoring, effect: NoSchedule }

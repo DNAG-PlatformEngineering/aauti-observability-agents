@@ -1,0 +1,7 @@
+# never commit secrets
+*.secret.yaml
+*-secrets.yaml
+*.password
+*.key
+*.crt
+kubeconfig*

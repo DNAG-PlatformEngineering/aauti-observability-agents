@@ -1,0 +1,43 @@
+{{- if and (eq .Values.mode "hub") .Values.grafana.enabled }}
+{{- /*
+  Dashboards as code.
+  * dashboards/<name>.json are templates shared by all tenants; each tenant
+    lists the ones it wants in tenants.<id>.dashboards.
+  * dashboards/tenants/<id>/*.json are tenant-specific extras (always loaded).
+  Placeholders replaced at render time:
+    __METRICS_DS__ -> mimir-<id>   __LOGS_DS__ -> loki-<id>
+    __TENANT__     -> <id>         __TENANT_TITLE__ -> Tenant title
+  The Grafana sidecar puts each ConfigMap into the folder named by the
+  grafana_folder annotation (one folder per tenant).
+*/}}
+{{- range $id, $t := .Values.tenants }}
+{{- $title := include "obs.tenantTitle" (dict "root" $ "tenant" $id) }}
+{{- $files := dict }}
+{{- range $d := ($t.dashboards | default list) }}
+{{- $path := printf "dashboards/%s.json" $d }}
+{{- $content := $.Files.Get $path }}
+{{- if not $content }}{{ fail (printf "tenant %s: dashboard %s not found" $id $path) }}{{ end }}
+{{- $_ := set $files (printf "%s.json" $d) $content }}
+{{- end }}
+{{- range $path, $_ := $.Files.Glob (printf "dashboards/tenants/%s/*.json" $id) }}
+{{- $_ := set $files (base $path) ($.Files.Get $path) }}
+{{- end }}
+{{- if $files }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-dashboards-{{ $id }}
+  labels:
+    {{- include "obs.labels" $ | nindent 4 }}
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: {{ $title | quote }}
+data:
+  {{- range $name, $content := $files }}
+  {{ $id }}-{{ $name }}: |-
+    {{- $content | replace "__METRICS_DS__" (printf "mimir-%s" $id) | replace "__LOGS_DS__" (printf "loki-%s" $id) | replace "__TENANT_TITLE__" $title | replace "__TENANT__" $id | replace "__ENVIRONMENTS__" (join "," ($t.environments | default (list "dev" "qa" "demo" "sandbox" "shared"))) | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

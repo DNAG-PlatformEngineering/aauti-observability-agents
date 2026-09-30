@@ -1,0 +1,118 @@
+{{- if and (eq .Values.mode "hub") .Values.gateway.enabled }}
+{{- $name := include "obs.gatewayName" . }}
+{{- $up := .Values.gateway.upstreams }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  labels: {{- include "obs.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    worker_processes auto;
+    pid /tmp/nginx.pid;
+    error_log /dev/stderr warn;
+
+    events { worker_connections 4096; }
+
+    http {
+      client_body_temp_path /tmp/client_temp;
+      proxy_temp_path       /tmp/proxy_temp;
+      fastcgi_temp_path     /tmp/fastcgi_temp;
+      uwsgi_temp_path       /tmp/uwsgi_temp;
+      scgi_temp_path        /tmp/scgi_temp;
+      server_tokens off;
+      sendfile on;
+      tcp_nopush on;
+      resolver {{ include "obs.gatewayResolver" . }} valid=10s ipv6=off;
+
+      # ------------------------------------------------------------------
+      # Tenant isolation: the tenant is derived from the authenticated user,
+      # never from the client. A client-supplied X-Scope-OrgID is accepted
+      # only if it equals the caller's own tenant (so "a|b" federation and
+      # cross-tenant reads/writes are rejected with 403).
+      # ------------------------------------------------------------------
+      map $remote_user $tenant_id {
+        default "";
+        {{- range $id, $_ := .Values.tenants }}
+        "{{ $id }}" "{{ $id }}";
+        {{- end }}
+      }
+      map "$tenant_id:$http_x_scope_orgid" $tenant_header_ok {
+        default        0;
+        "~^:"          1;   # not authenticated yet -> let auth_basic answer 401
+        "~^[^:]+:$"    1;   # no header sent
+        "~^([^:]+):\1$" 1;  # header equals own tenant
+      }
+
+      log_format logfmt 'ts=$time_iso8601 client=$remote_addr user="$remote_user" tenant="$tenant_id" '
+                        'method=$request_method path="$uri" status=$status bytes_in=$request_length '
+                        'bytes_out=$body_bytes_sent duration=$request_time upstream="$upstream_addr"';
+      access_log /dev/stdout logfmt;
+
+      proxy_http_version 1.1;
+      proxy_read_timeout 300s;
+      proxy_send_timeout 300s;
+      client_max_body_size {{ .Values.gateway.clientMaxBodySize }};
+
+      server {
+        listen 8443 ssl;
+        http2 on;
+        ssl_certificate     /etc/nginx/tls/tls.crt;
+        ssl_certificate_key /etc/nginx/tls/tls.key;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+        ssl_session_cache   shared:SSL:10m;
+
+        set $loki_write {{ tpl $up.lokiWrite . }};
+        set $loki_read  {{ tpl $up.lokiRead . }};
+        set $mimir_write {{ tpl $up.mimirWrite . }};
+        set $mimir_read  {{ tpl $up.mimirRead . }};
+
+        auth_basic           "observability";
+        auth_basic_user_file /etc/nginx/htpasswd/.htpasswd;
+
+        if ($tenant_header_ok = 0) {
+          return 403 "X-Scope-OrgID does not match the authenticated tenant\n";
+        }
+
+        proxy_set_header X-Scope-OrgID   $tenant_id;
+        proxy_set_header Authorization   "";
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Connection      "";
+
+        location = /ready {
+          auth_basic off;
+          access_log off;
+          return 200 "ready\n";
+        }
+
+        # ---------------- Mimir ----------------
+        location = /api/v1/push            { proxy_pass $mimir_write; }
+        location = /otlp/v1/metrics        { proxy_pass $mimir_write; }
+        location /prometheus/              { proxy_pass $mimir_read; }
+        location = /api/v1/status/buildinfo { proxy_pass $mimir_read; }
+
+        # ---------------- Loki -----------------
+        location = /loki/api/v1/push       { proxy_pass $loki_write; }
+        location = /otlp/v1/logs           { proxy_pass $loki_write; }
+        location = /loki/api/v1/tail {
+          proxy_pass $loki_read;
+          proxy_set_header X-Scope-OrgID $tenant_id;
+          proxy_set_header Authorization "";
+          proxy_set_header Upgrade       $http_upgrade;
+          proxy_set_header Connection    "upgrade";
+        }
+        location /loki/api/                { proxy_pass $loki_read; }
+
+        location / { return 404 "not found\n"; }
+      }
+
+      # Plain-HTTP port for kubelet probes only (no data routes).
+      server {
+        listen 8080;
+        access_log off;
+        location = /ready { return 200 "ready\n"; }
+        location = /nginx_status { stub_status; }
+        location / { return 404; }
+      }
+    }
+{{- end }}

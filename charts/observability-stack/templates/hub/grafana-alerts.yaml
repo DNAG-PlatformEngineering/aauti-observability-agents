@@ -1,0 +1,101 @@
+{{- if and (eq .Values.mode "hub") .Values.grafana.enabled .Values.alerting.enabled }}
+{{- $ds := printf "mimir-%s" .Values.agent.tenant }}
+{{- $thr := .Values.alerting.usageThreshold }}
+{{- $rf := dig "mimir" "structuredConfig" "ingester" "ring" "replication_factor" 3 .Values.mimir }}
+{{- $lokiDefaultRate := dig "loki" "limits_config" "ingestion_rate_mb" 4 .Values.loki }}
+{{- $quiet := list .Values.k6.tenant | join "|" }}
+{{- $p := .Values.alerting.pendingPeriod }}
+{{- /* Loki has no overrides-exporter in SingleBinary mode: build the per-tenant
+       bytes/s limit vector from values. */}}
+{{- $lokiLimit := list }}
+{{- range $id, $t := .Values.tenants }}
+{{- $mb := dig "logs" "limits" "ingestion_rate_mb" $lokiDefaultRate $t }}
+{{- $lokiLimit = append $lokiLimit (printf "label_replace(vector(%.0f), \"tenant\", \"%s\", \"\", \"\")" (mulf $mb 1048576) $id) }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-grafana-alerts
+  labels:
+    {{- include "obs.labels" . | nindent 4 }}
+    grafana_alert: "1"
+data:
+  tenant-usage-alerts.yaml: |
+    apiVersion: 1
+    groups:
+      - orgId: 1
+        name: tenant-usage
+        folder: {{ .Values.alerting.folder | quote }}
+        interval: 1m
+        rules:
+          {{- include "obs.alertRule" (dict
+                "uid" "mimir-tenant-series-near-limit"
+                "title" "Mimir tenant near active-series limit"
+                "ds" $ds "pending" $p
+                "expr" (printf "(sum by (user) (cortex_ingester_active_series) / %v) / on (user) max by (user) (cortex_limits_overrides{limit_name=\"max_global_series_per_user\"})" $rf)
+                "op" "gt" "value" $thr
+                "summary" "Tenant {{ $labels.user }} uses {{ humanizePercentage $values.A.Value }} of its series limit"
+                "description" "Raise tenants.<id>.metrics.limits.max_global_series_per_user or reduce cardinality at the spoke.") | nindent 10 }}
+          {{- include "obs.alertRule" (dict
+                "uid" "mimir-tenant-ingestion-near-limit"
+                "title" "Mimir tenant near ingestion-rate limit"
+                "ds" $ds "pending" $p
+                "expr" "sum by (user) (rate(cortex_distributor_received_samples_total[5m])) / on (user) max by (user) (cortex_limits_overrides{limit_name=\"ingestion_rate\"})"
+                "op" "gt" "value" $thr
+                "summary" "Tenant {{ $labels.user }} ingests at {{ humanizePercentage $values.A.Value }} of its samples/s limit"
+                "description" "Samples above the limit are rejected (HTTP 429) for this tenant only.") | nindent 10 }}
+          {{- include "obs.alertRule" (dict
+                "uid" "mimir-tenant-samples-discarded"
+                "title" "Mimir tenant samples discarded"
+                "ds" $ds "pending" $p
+                "expr" "sum by (user, reason) (rate(cortex_discarded_samples_total[5m]))"
+                "op" "gt" "value" 0 "for" "5m"
+                "summary" "Tenant {{ $labels.user }} is losing samples ({{ $labels.reason }})"
+                "description" "Mimir is rejecting data for this tenant; see the Tenant Usage dashboard.") | nindent 10 }}
+          {{- include "obs.alertRule" (dict
+                "uid" "loki-tenant-ingestion-near-limit"
+                "title" "Loki tenant near ingestion-rate limit"
+                "ds" $ds "pending" $p
+                "expr" (printf "sum by (tenant) (rate(loki_distributor_bytes_received_total[5m])) / on (tenant) (%s)" (join " or " $lokiLimit))
+                "op" "gt" "value" $thr
+                "summary" "Tenant {{ $labels.tenant }} sends logs at {{ humanizePercentage $values.A.Value }} of its MB/s limit"
+                "description" "Raise tenants.<id>.logs.limits.ingestion_rate_mb or drop noisy streams at the spoke.") | nindent 10 }}
+          {{- include "obs.alertRule" (dict
+                "uid" "loki-tenant-logs-discarded"
+                "title" "Loki tenant logs discarded"
+                "ds" $ds "pending" $p
+                "expr" "sum by (tenant, reason) (rate(loki_discarded_bytes_total[5m]))"
+                "op" "gt" "value" 0 "for" "5m"
+                "summary" "Tenant {{ $labels.tenant }} is losing logs ({{ $labels.reason }})"
+                "description" "Loki is rejecting log lines for this tenant; see the Tenant Usage dashboard.") | nindent 10 }}
+          {{- include "obs.alertRule" (dict
+                "uid" "tenant-metrics-stopped"
+                "title" "Tenant stopped sending metrics"
+                "ds" $ds "pending" $p
+                "expr" (printf "sum by (user) (rate(cortex_distributor_received_samples_total{user!~\"%s\"}[10m]))" $quiet)
+                "op" "lt" "value" 0.01 "severity" "critical"
+                "summary" "No metrics received from tenant {{ $labels.user }} for 10m"
+                "description" "The spoke agent is down or cannot reach the hub gateway (credentials, TLS, network).") | nindent 10 }}
+          {{- include "obs.alertRule" (dict
+                "uid" "tenant-logs-stopped"
+                "title" "Tenant stopped sending logs"
+                "ds" $ds "pending" $p
+                "expr" (printf "sum by (tenant) (rate(loki_distributor_lines_received_total{tenant!~\"%s\"}[10m]))" $quiet)
+                "op" "lt" "value" 0.01 "severity" "critical"
+                "summary" "No logs received from tenant {{ $labels.tenant }} for 10m"
+                "description" "The spoke agent is down or cannot reach the hub gateway (credentials, TLS, network).") | nindent 10 }}
+    {{- $cps := .Values.alerting.contactPoints | default list }}
+    {{- with .Values.alerting.webhook.url }}
+    {{- $cps = append $cps (dict "orgId" 1 "name" "platform-webhook" "receivers" (list (dict "uid" "platform-webhook" "type" "webhook" "settings" (dict "url" . "httpMethod" "POST")))) }}
+    {{- end }}
+    {{- with $cps }}
+    contactPoints: {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- $pol := .Values.alerting.policies | default list }}
+    {{- if and (not $pol) .Values.alerting.webhook.url }}
+    {{- $pol = list (dict "orgId" 1 "receiver" "platform-webhook" "group_by" (list "grafana_folder" "alertname") "group_wait" "30s" "group_interval" "5m" "repeat_interval" "4h") }}
+    {{- end }}
+    {{- with $pol }}
+    policies: {{- toYaml . | nindent 6 }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,101 @@
+{{- if and (eq .Values.mode "hub") .Values.grafana.enabled .Values.grafanaAccess.enabled }}
+{{- $tenants := dict }}
+{{- range $id, $t := .Values.tenants }}
+{{- $hasDash := or (not (empty $t.dashboards)) (not (empty ($.Files.Glob (printf "dashboards/tenants/%s/*.json" $id)))) }}
+{{- $_ := set $tenants $id (dict "title" (include "obs.tenantTitle" (dict "root" $ "tenant" $id)) "hasDashboards" $hasDash) }}
+{{- end }}
+{{- $users := list }}
+{{- range .Values.grafanaAccess.users }}
+{{- $users = append $users (omit . "password") }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-grafana-access
+  labels: {{- include "obs.labels" . | nindent 4 }}
+data:
+  grafana-access.py: |
+    {{- .Files.Get "files/grafana-access.py" | nindent 4 }}
+  access.json: |
+    {{- dict "tenants" $tenants "users" $users "folderPermission" .Values.tenantFolderPermission "alertFolder" (ternary .Values.alerting.folder "" .Values.alerting.enabled) "isolation" .Values.grafanaAccess.isolation "platformTenant" .Values.agent.tenant "gatewayUrl" (include "obs.gatewayInternalUrl" .) "scrapeInterval" .Values.agent.metrics.scrapeInterval | toPrettyJson | nindent 4 }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: observability-grafana-users
+  labels: {{- include "obs.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+type: Opaque
+stringData:
+  {{- range .Values.grafanaAccess.users }}
+  {{ .login }}: {{ include "obs.stableSecretValue" (dict "root" $ "secret" "observability-grafana-users" "key" .login "value" .password) | quote }}
+  {{- end }}
+---
+# New Job per revision (name includes the revision) so every upgrade
+# re-applies teams, folder permissions and users.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: observability-grafana-access-r{{ .Release.Revision }}
+  labels: {{- include "obs.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: observability-grafana-access
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: bootstrap
+          image: "{{ .Values.grafanaAccess.image.repository }}:{{ .Values.grafanaAccess.image.tag }}"
+          command: ["python", "-u", "/config/grafana-access.py"]
+          env:
+            - name: GRAFANA_URL
+              value: http://grafana.{{ .Release.Namespace }}.svc
+            - name: GF_ADMIN_USER
+              valueFrom: { secretKeyRef: { name: observability-grafana-admin, key: admin-user } }
+            - name: GF_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: observability-grafana-admin, key: admin-password } }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 128Mi }
+          volumeMounts:
+            - { name: config, mountPath: /config, readOnly: true }
+            - { name: users, mountPath: /secrets/users, readOnly: true }
+            {{- if eq .Values.grafanaAccess.isolation "orgs" }}
+            - { name: tenants, mountPath: /secrets/tenants, readOnly: true }
+            - { name: hub-ca, mountPath: /secrets/hub-ca, readOnly: true }
+            {{- range $id, $_ := .Values.tenants }}
+            - { name: dash-{{ $id }}, mountPath: /dashboards/{{ $id }}, readOnly: true }
+            {{- end }}
+            {{- end }}
+      volumes:
+        - name: config
+          configMap: { name: observability-grafana-access }
+        - name: users
+          secret: { secretName: observability-grafana-users, optional: true }
+        {{- if eq .Values.grafanaAccess.isolation "orgs" }}
+        - name: tenants
+          secret: { secretName: observability-tenant-credentials }
+        - name: hub-ca
+          secret: { secretName: observability-hub-ca }
+        {{- range $id, $_ := .Values.tenants }}
+        - name: dash-{{ $id }}
+          configMap:
+            name: observability-dashboards-{{ $id }}
+            optional: true
+            # keys are "<id>-<name>.json"; the Job imports every *.json file
+        {{- end }}
+        {{- end }}
+{{- end }}

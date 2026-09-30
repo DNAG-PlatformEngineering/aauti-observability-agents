@@ -1,0 +1,36 @@
+{{- if and (eq .Values.mode "hub") .Values.networkPolicy.enabled }}
+# Loki, Mimir and MinIO accept traffic only from pods in the hub namespace.
+# Everything outside (spokes, other namespaces) must go through the
+# authenticating gateway, which is the only thing allowed in from anywhere.
+{{- $targets := dict "loki" (dict "app.kubernetes.io/name" "loki") "mimir" (dict "app.kubernetes.io/name" "mimir") "minio" (dict "app" "minio") }}
+{{- range $app, $selector := $targets }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: observability-{{ $app }}-ingress
+  labels: {{- include "obs.labels" $ | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- toYaml $selector | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: observability-gateway-ingress
+  labels: {{- include "obs.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "obs.gatewayName" . }}
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - { port: 8443, protocol: TCP }
+        - { port: 8080, protocol: TCP }
+{{- end }}

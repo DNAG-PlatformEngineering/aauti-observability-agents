@@ -1,0 +1,41 @@
+# Private entry point for spoke agents: an INTERNAL passthrough load balancer
+# in front of observability-gateway (NGINX, TLS on 8443, basic auth per tenant).
+#
+# - Separate Service; the chart's ClusterIP Service observability-gateway
+#   (used by Grafana in-cluster) is not touched.
+# - Fixed IP 10.40.16.10 in aauti-hub-vpc-as1-ingest-subnet, reserved as
+#   aauti-hub-vpc-as1-obs-gateway-ilb (../../../network/aauti-jitsi-nonprod.ps1).
+# - Reachable only from VPC-peered spoke networks. GKE creates the VPC firewall
+#   rule from loadBalancerSourceRanges, so add each spoke's node + pod ranges
+#   here when it onboards.
+# - TLS: clients connect to the IP and verify the gateway certificate with
+#   SNI observability-gateway.observability.svc (agent.tls.serverName).
+apiVersion: v1
+kind: Service
+metadata:
+  name: observability-gateway-internal
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: observability-gateway
+    app.kubernetes.io/component: spoke-ingest
+  annotations:
+    networking.gke.io/load-balancer-type: Internal
+    networking.gke.io/internal-load-balancer-subnet: aauti-hub-vpc-as1-ingest-subnet
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 10.40.16.10
+  # Local: keep the spoke's source IP (the gateway logs it as client=...), so
+  # verify.ps1 can prove requests arrive from the spoke's private ranges.
+  externalTrafficPolicy: Local
+  selector:
+    app.kubernetes.io/instance: observability
+    app.kubernetes.io/name: observability-gateway
+  ports:
+    - name: https
+      port: 443
+      targetPort: https
+      protocol: TCP
+  loadBalancerSourceRanges:
+    # aauti-jitsi-nonprod-gke (project aauti-jitsi-noprod, VPC aauti-jitsi-nonprod-vpc)
+    - 10.16.0.0/24     # node subnet aauti-jitsi-nonprod-gke-subnet
+    - 10.17.0.0/17     # pod range (pod IPs are not masqueraded inside 10.0.0.0/8)

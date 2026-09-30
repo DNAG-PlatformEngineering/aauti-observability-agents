@@ -1,0 +1,100 @@
+{{- if and (eq .Values.mode "hub") .Values.k6.enabled }}
+{{- $k6 := .Values.k6 }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-k6-scripts
+  labels: {{- include "obs.labels" . | nindent 4 }}
+data:
+  {{- range $path, $_ := .Files.Glob "files/k6/*.js" }}
+  {{ base $path }}: |
+    {{- $.Files.Get $path | nindent 4 }}
+  {{- end }}
+  {{- range $name, $t := $k6.tests }}
+  {{- if $t.scriptContent }}
+  {{ $name }}.js: |
+    {{- $t.scriptContent | nindent 4 }}
+  {{- end }}
+  {{- end }}
+{{- range $name, $t := $k6.tests }}
+{{- $script := ternary (printf "%s.js" $name) ($t.script | default "http-load.js") (not (empty $t.scriptContent)) }}
+---
+# k6 load test "{{ $name }}". Results -> Mimir tenant "{{ $k6.tenant }}" via
+# the gateway (Prometheus remote-write output). Run now with:
+#   kubectl -n {{ $.Release.Namespace }} create job --from=cronjob/k6-{{ $name }} k6-{{ $name }}-$(date +%s)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: k6-{{ $name }}
+  labels:
+    {{- include "obs.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: k6
+    k6.observability.aauti.com/test: {{ $name }}
+spec:
+  schedule: {{ $t.schedule | default "0 2 * * *" | quote }}
+  suspend: {{ ternary $t.suspend true (hasKey $t "suspend") }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: k6
+            k6.observability.aauti.com/test: {{ $name }}
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 12345
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: k6
+              image: "{{ $k6.image.repository }}:{{ $k6.image.tag }}"
+              args:
+                - run
+                - --out=experimental-prometheus-rw
+                - --tag=testid={{ $name }}
+                - --no-color
+                - /scripts/{{ $script }}
+              env:
+                - name: K6_PROMETHEUS_RW_SERVER_URL
+                  value: {{ include "obs.gatewayInternalUrl" $ }}/api/v1/push
+                - name: K6_PROMETHEUS_RW_USERNAME
+                  value: {{ $k6.tenant }}
+                - name: K6_PROMETHEUS_RW_PASSWORD
+                  valueFrom: { secretKeyRef: { name: observability-tenant-credentials, key: {{ $k6.tenant }} } }
+                - name: K6_PROMETHEUS_RW_TREND_STATS
+                  value: "p(50),p(90),p(95),p(99),avg,min,max"
+                - name: K6_PROMETHEUS_RW_PUSH_INTERVAL
+                  value: 5s
+                - name: K6_PROMETHEUS_RW_STALE_MARKERS
+                  value: "true"
+                # Trust the hub CA for the remote-write connection.
+                - name: SSL_CERT_FILE
+                  value: /etc/hub-ca/ca.crt
+                {{- range $k, $v := $t.env }}
+                - name: {{ $k }}
+                  value: {{ $v | quote }}
+                {{- end }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
+              resources: {{- toYaml ($t.resources | default $k6.resources) | nindent 16 }}
+              volumeMounts:
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: hub-ca, mountPath: /etc/hub-ca, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - name: scripts
+              configMap: { name: observability-k6-scripts }
+            - name: hub-ca
+              secret: { secretName: observability-hub-ca }
+            - name: tmp
+              emptyDir: {}
+{{- end }}
+{{- end }}

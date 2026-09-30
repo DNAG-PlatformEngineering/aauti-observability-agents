@@ -1,0 +1,57 @@
+{{- if not (has .Values.mode (list "hub" "spoke")) }}
+{{- fail (printf "mode must be \"hub\" or \"spoke\", got %q" .Values.mode) }}
+{{- end }}
+{{- if not .Values.cluster.name }}
+{{- fail "cluster.name is required (it becomes the `cluster` label on all data)" }}
+{{- end }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9_-]*$" .Values.agent.tenant) }}
+{{- fail "agent.tenant must match ^[a-z0-9][a-z0-9_-]*$" }}
+{{- end }}
+{{- if and (eq .Values.agent.logs.method "file") (ne .Values.alloy.controller.type "daemonset") }}
+{{- fail "agent.logs.method=file requires alloy.controller.type=daemonset" }}
+{{- end }}
+{{- if and (ne .Values.alloy.controller.type "daemonset") (gt (int .Values.alloy.controller.replicas) 1) }}
+{{- fail "more than one non-daemonset agent replica would collect everything twice; keep alloy.controller.replicas=1" }}
+{{- end }}
+{{- if eq .Values.alloy.controller.type "daemonset" }}
+{{- if .Values.agent.logs.events }}
+{{- fail "agent.logs.events with a daemonset would ship every event once per node; set agent.logs.events=false" }}
+{{- end }}
+{{- if and .Values.agent.metrics.kubeStateMetrics.enabled (not .Values.alloy.alloy.clustering.enabled) }}
+{{- fail "a daemonset agent needs alloy.alloy.clustering.enabled=true so kube-state-metrics is scraped once" }}
+{{- end }}
+{{- end }}
+
+{{- if eq .Values.mode "hub" }}
+{{- range $id, $t := .Values.tenants }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9_-]*$" $id) }}
+{{- fail (printf "tenant id %q must match ^[a-z0-9][a-z0-9_-]*$ (it is used as X-Scope-OrgID, username and uid)" $id) }}
+{{- end }}
+{{- end }}
+{{- if and .Values.alloy.enabled (not (hasKey .Values.tenants .Values.agent.tenant)) }}
+{{- fail (printf "agent.tenant %q (hub self-monitoring) is not defined in tenants" .Values.agent.tenant) }}
+{{- end }}
+{{- if and .Values.k6.enabled (not (hasKey .Values.tenants .Values.k6.tenant)) }}
+{{- fail (printf "k6.tenant %q is not defined in tenants" .Values.k6.tenant) }}
+{{- end }}
+{{- if and (or .Values.gateway.tls.existingSecret .Values.gateway.tls.certManager.enabled) (not .Values.gateway.tls.caCert) }}
+{{- fail "gateway.tls.caCert (PEM of the issuing CA) is required with gateway.tls.existingSecret / certManager" }}
+{{- end }}
+{{- end }}
+
+{{- if eq .Values.mode "spoke" }}
+{{- if not .Values.agent.hubUrl }}
+{{- fail "agent.hubUrl is required in spoke mode (e.g. https://observability.example.com)" }}
+{{- end }}
+{{- if and (not .Values.agent.auth.existingSecret) (not .Values.agent.auth.password) }}
+{{- fail "spoke mode needs agent.auth.password (or agent.auth.existingSecret=true with a Secret named observability-agent-auth)" }}
+{{- end }}
+{{- if and (not .Values.agent.tls.caCert) (not .Values.agent.tls.insecureSkipVerify) (not (hasPrefix "http://" .Values.agent.hubUrl)) }}
+{{- fail "agent.tls.caCert is required to verify the hub (or set agent.tls.insecureSkipVerify=true for throw-away tests)" }}
+{{- end }}
+{{- range $c := list "loki" "mimir" "grafana" "minio" }}
+{{- if (index $.Values $c).enabled }}
+{{- fail (printf "%s.enabled must be false in spoke mode" $c) }}
+{{- end }}
+{{- end }}
+{{- end }}

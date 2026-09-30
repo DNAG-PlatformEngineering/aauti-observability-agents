@@ -1,0 +1,186 @@
+# Standalone Grafana for aauti-hub-as1-obs-gke, served at https://grafana.aauti.ai
+# Chart: grafana/grafana 10.5.15. Datasources: Loki + Mimir per tenant
+# (platform, jitsi). Dashboards: folder per tenant (currently Jitsi-nonprod).
+#
+# Exposure: GKE Ingress (external HTTPS LB) + Google-managed certificate on the
+# reserved global static IP "aauti-hub-vpc-as1-grafana-ip" (8.233.134.60).
+
+replicas: 1
+
+admin:
+  # Created by deploy.ps1 with a random password; never stored in this repo.
+  existingSecret: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
+
+persistence:
+  enabled: true
+  type: pvc
+  storageClassName: standard-rwo
+  size: 10Gi
+
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits: { memory: 512Mi }
+
+# Run on the dedicated "observability" node pool (tainted workload=observability).
+nodeSelector:
+  cloud.google.com/gke-nodepool: observability
+tolerations:
+  - { key: workload, operator: Equal, value: observability, effect: NoSchedule }
+
+grafana.ini:
+  server:
+    domain: grafana.aauti.ai
+    root_url: https://grafana.aauti.ai
+  security:
+    cookie_secure: true
+    disable_gravatar: true
+  users:
+    allow_sign_up: false
+    auto_assign_org_role: Viewer
+  auth.anonymous:
+    enabled: false
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+
+# Loki + Mimir of tenant "platform", through the observability gateway (HTTPS,
+# private CA, basic auth). Password and CA come from Secret
+# grafana-hub-datasource, copied from namespace "observability" by deploy.ps1.
+extraSecretMounts:
+  - name: hub-datasource
+    secretName: grafana-hub-datasource
+    mountPath: /etc/grafana/hub
+    readOnly: true
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Loki – Platform
+        uid: loki-platform
+        type: loki
+        access: proxy
+        url: https://observability-gateway.observability.svc:443
+        basicAuth: true
+        basicAuthUser: platform
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          httpHeaderName1: X-Scope-OrgID
+          maxLines: 1000
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/platform}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+          httpHeaderValue1: platform
+      - name: Mimir – Platform
+        uid: mimir-platform
+        type: prometheus
+        access: proxy
+        url: https://observability-gateway.observability.svc:443/prometheus
+        basicAuth: true
+        basicAuthUser: platform
+        isDefault: true
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          httpHeaderName1: X-Scope-OrgID
+          prometheusType: Mimir
+          timeInterval: 60s
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/platform}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+          httpHeaderValue1: platform
+      # Tenant "jitsi" (spokes: aauti-jitsi-nonprod-gke). Same gateway, own
+      # credentials, so these datasources can only read Jitsi data.
+      - name: Loki – Jitsi
+        uid: loki-jitsi
+        type: loki
+        access: proxy
+        url: https://observability-gateway.observability.svc:443
+        basicAuth: true
+        basicAuthUser: jitsi
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          httpHeaderName1: X-Scope-OrgID
+          maxLines: 1000
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/jitsi}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+          httpHeaderValue1: jitsi
+      - name: Mimir – Jitsi
+        uid: mimir-jitsi
+        type: prometheus
+        access: proxy
+        url: https://observability-gateway.observability.svc:443/prometheus
+        basicAuth: true
+        basicAuthUser: jitsi
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          httpHeaderName1: X-Scope-OrgID
+          prometheusType: Mimir
+          timeInterval: 60s
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/jitsi}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+          httpHeaderValue1: jitsi
+
+# Dashboards as code: one provider + folder per tenant. deploy.ps1 renders the
+# ConfigMap grafana-dashboards-<tenant> from charts/observability-stack/dashboards
+# (shared templates listed in the tenant's `dashboards` + dashboards/tenants/<tenant>/).
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: jitsi
+        orgId: 1
+        folder: Jitsi-nonprod
+        type: file
+        disableDeletion: true
+        editable: false
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/jitsi
+dashboardsConfigMaps:
+  jitsi: grafana-dashboards-jitsi
+
+sidecar:
+  datasources: { enabled: false }
+  dashboards: { enabled: false }
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+
+ingress:
+  enabled: true
+  ingressClassName: ""   # GKE uses the annotation below, not an IngressClass
+  annotations:
+    kubernetes.io/ingress.class: gce
+    kubernetes.io/ingress.global-static-ip-name: aauti-hub-vpc-as1-grafana-ip
+    networking.gke.io/managed-certificates: grafana-cert
+    networking.gke.io/v1beta1.FrontendConfig: grafana-frontend
+  hosts: [grafana.aauti.ai]
+  path: /
+  pathType: Prefix
+
+extraObjects:
+  - apiVersion: networking.gke.io/v1
+    kind: ManagedCertificate
+    metadata:
+      name: grafana-cert
+    spec:
+      domains: [grafana.aauti.ai]
+  - apiVersion: networking.gke.io/v1beta1
+    kind: FrontendConfig
+    metadata:
+      name: grafana-frontend
+    spec:
+      redirectToHttps:
+        enabled: true
+        responseCodeName: MOVED_PERMANENTLY_DEFAULT

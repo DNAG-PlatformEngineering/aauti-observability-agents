@@ -1,0 +1,58 @@
+{{- if and (eq .Values.mode "hub") .Values.grafana.enabled }}
+{{- $url := include "obs.gatewayInternalUrl" . }}
+# One Loki + one Mimir datasource per tenant. Each authenticates to the gateway
+# as that tenant, so a datasource can never read another tenant's data.
+# Passwords/CA are read from mounted Secrets via $__file{} at provisioning time.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: observability-grafana-datasources
+  labels:
+    {{- include "obs.labels" . | nindent 4 }}
+    grafana_datasource: "1"
+type: Opaque
+stringData:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    {{- range $id, $t := .Values.tenants }}
+    {{- $title := include "obs.tenantTitle" (dict "root" $ "tenant" $id) }}
+      - name: "Loki – {{ $title }}"
+        uid: loki-{{ $id }}
+        type: loki
+        access: proxy
+        url: {{ $url }}
+        basicAuth: true
+        basicAuthUser: {{ $id }}
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          httpHeaderName1: X-Scope-OrgID
+          maxLines: 1000
+          timeout: 300
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/tenants/{{ $id }}}
+          tlsCACert: $__file{/etc/grafana/hub-ca/ca.crt}
+          httpHeaderValue1: {{ $id }}
+      - name: "Mimir – {{ $title }}"
+        uid: mimir-{{ $id }}
+        type: prometheus
+        access: proxy
+        url: {{ $url }}/prometheus
+        basicAuth: true
+        basicAuthUser: {{ $id }}
+        isDefault: {{ eq $id $.Values.agent.tenant }}
+        editable: false
+        jsonData:
+          prometheusType: Mimir
+          prometheusVersion: 2.9.1
+          httpMethod: POST
+          timeInterval: {{ $.Values.agent.metrics.scrapeInterval }}
+          tlsAuthWithCACert: true
+          httpHeaderName1: X-Scope-OrgID
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/tenants/{{ $id }}}
+          tlsCACert: $__file{/etc/grafana/hub-ca/ca.crt}
+          httpHeaderValue1: {{ $id }}
+    {{- end }}
+{{- end }}

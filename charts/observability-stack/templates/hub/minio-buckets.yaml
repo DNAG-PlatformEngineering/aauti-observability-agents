@@ -1,0 +1,62 @@
+{{- if and (eq .Values.mode "hub") .Values.minio.enabled }}
+# Creates the buckets as a regular Job (not a Helm hook): Loki and Mimir need
+# them to start, and post-install hooks only run after `--wait` succeeds.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: observability-minio-buckets-r{{ .Release.Revision }}
+  labels: {{- include "obs.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: observability-minio-buckets
+    spec:
+      {{- with .Values.scheduling.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.scheduling.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: mc
+          image: "{{ .Values.minio.mcImage.repository }}:{{ .Values.minio.mcImage.tag }}"
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              until mc alias set hub http://observability-minio:9000 "$ROOT_USER" "$ROOT_PASSWORD" >/dev/null 2>&1; do
+                echo "waiting for minio"; sleep 3
+              done
+              {{- range .Values.observabilityBuckets }}
+              mc mb --ignore-existing hub/{{ . }}
+              {{- end }}
+              echo "buckets ready"
+          env:
+            - name: MC_CONFIG_DIR
+              value: /tmp/mc
+            - name: ROOT_USER
+              valueFrom: { secretKeyRef: { name: observability-object-storage, key: rootUser } }
+            - name: ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: observability-object-storage, key: rootPassword } }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 128Mi }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

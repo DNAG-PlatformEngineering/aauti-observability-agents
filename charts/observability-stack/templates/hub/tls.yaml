@@ -1,0 +1,53 @@
+{{- if and (eq .Values.mode "hub") .Values.gateway.enabled }}
+{{- $tlsSecret := include "obs.gatewayTLSSecretName" . }}
+{{- if .Values.gateway.tls.certManager.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: observability-gateway
+  labels: {{- include "obs.labels" . | nindent 4 }}
+spec:
+  secretName: {{ $tlsSecret }}
+  issuerRef: {{- toYaml .Values.gateway.tls.certManager.issuerRef | nindent 4 }}
+  dnsNames:
+    - {{ include "obs.gatewayName" . }}.{{ .Release.Namespace }}.svc
+    - {{ include "obs.gatewayName" . }}.{{ .Release.Namespace }}.svc.cluster.local
+    {{- if .Values.gateway.ingress.enabled }}
+    - {{ .Values.gateway.ingress.host }}
+    {{- end }}
+    {{- range .Values.gateway.tls.extraDnsNames }}
+    - {{ . }}
+    {{- end }}
+---
+{{- else if not .Values.gateway.tls.existingSecret }}
+{{- $tls := include "obs.gatewayTLS" . | fromJson }}
+# Generated private CA + server certificate for the gateway. Persisted across
+# upgrades; delete this Secret (and observability-hub-ca) to rotate.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $tlsSecret }}
+  labels: {{- include "obs.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+type: kubernetes.io/tls
+data:
+  tls.crt: {{ $tls.crt | b64enc | quote }}
+  tls.key: {{ $tls.key | b64enc | quote }}
+  ca.crt: {{ $tls.ca | b64enc | quote }}
+---
+{{- end }}
+# Public CA bundle that clients (Grafana, k6, agents, spokes) trust.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: observability-hub-ca
+  labels: {{- include "obs.labels" . | nindent 4 }}
+type: Opaque
+data:
+  {{- if or .Values.gateway.tls.existingSecret .Values.gateway.tls.certManager.enabled }}
+  ca.crt: {{ .Values.gateway.tls.caCert | b64enc | quote }}
+  {{- else }}
+  ca.crt: {{ (include "obs.gatewayTLS" . | fromJson).ca | b64enc | quote }}
+  {{- end }}
+{{- end }}

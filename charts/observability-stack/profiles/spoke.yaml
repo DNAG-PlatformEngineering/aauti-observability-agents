@@ -1,0 +1,9 @@
+# Spoke profile: collection agent only. Combine with the spoke's env file:
+#   helm upgrade --install observability-agent . -n observability-agent \
+#     -f profiles/spoke.yaml -f environments/<env>/spoke-<name>.yaml \
+#     --set agent.auth.password=... --set-file agent.tls.caCert=hub-ca.crt
+mode: spoke
+
+networkPolicy: { enabled: false }
+alloy: { enabled: true }
+kube-state-metrics: { enabled: true }

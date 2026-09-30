@@ -1,0 +1,83 @@
+{{- if and (eq .Values.mode "hub") .Values.demoAlertSink.enabled }}
+# Local stand-in for Slack/Teams/PagerDuty: prints each Grafana alert
+# notification as one line. View with: kubectl logs deploy/alert-sink -f
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alert-sink
+  labels: {{- include "obs.labels" . | nindent 4 }}
+data:
+  sink.py: |
+    import json
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            try:
+                msg = json.loads(body)
+                for a in msg.get("alerts", []):
+                    print(json.dumps({
+                        "status": a.get("status"),
+                        "alert": a.get("labels", {}).get("alertname"),
+                        "severity": a.get("labels", {}).get("severity"),
+                        "labels": {k: v for k, v in a.get("labels", {}).items() if k in ("user", "tenant", "reason")},
+                        "summary": a.get("annotations", {}).get("summary"),
+                    }), flush=True)
+            except ValueError:
+                print("non-JSON notification:", body[:500], flush=True)
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    print("alert-sink listening on :8080", flush=True)
+    HTTPServer(("", 8080), Handler).serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-sink
+  labels:
+    {{- include "obs.labels" . | nindent 4 }}
+    app.kubernetes.io/name: alert-sink
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: alert-sink }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: alert-sink }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: sink
+          image: "{{ .Values.grafanaAccess.image.repository }}:{{ .Values.grafanaAccess.image.tag }}"
+          command: ["python", "-u", "/app/sink.py"]
+          ports: [{ name: http, containerPort: 8080 }]
+          resources:
+            requests: { cpu: 5m, memory: 16Mi }
+            limits: { memory: 64Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: app, mountPath: /app }
+      volumes:
+        - name: app
+          configMap: { name: alert-sink }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alert-sink
+  labels: {{- include "obs.labels" . | nindent 4 }}
+spec:
+  selector: { app.kubernetes.io/name: alert-sink }
+  ports: [{ name: http, port: 80, targetPort: http }]
+{{- end }}

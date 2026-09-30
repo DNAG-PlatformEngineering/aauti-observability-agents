@@ -1,0 +1,47 @@
+{{- if eq .Values.mode "hub" }}
+{{- if .Values.loki.enabled }}
+# Loki runtime configuration: per-tenant limits + retention (reloaded every
+# runtime_config.period, no restart needed).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-loki-overrides
+  labels: {{- include "obs.labels" . | nindent 4 }}
+data:
+  overrides.yaml: |
+    overrides:
+    {{- range $id, $t := .Values.tenants }}
+    {{- $logs := $t.logs | default dict }}
+    {{- $o := deepCopy ($logs.limits | default dict) }}
+    {{- if $logs.retention }}{{ $_ := set $o "retention_period" $logs.retention }}{{ end }}
+    {{- if $logs.streamRetention }}{{ $_ := set $o "retention_stream" $logs.streamRetention }}{{ end }}
+      {{ $id }}:
+        {{- if $o }}
+        {{- toYaml $o | nindent 8 }}
+        {{- else }} {}
+        {{- end }}
+    {{- end }}
+{{- end }}
+{{- if .Values.mimir.enabled }}
+---
+# Mimir runtime configuration: per-tenant limits + block retention.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-mimir-overrides
+  labels: {{- include "obs.labels" . | nindent 4 }}
+data:
+  overrides.yaml: |
+    overrides:
+    {{- range $id, $t := .Values.tenants }}
+    {{- $m := $t.metrics | default dict }}
+    {{- $o := deepCopy ($m.limits | default dict) }}
+    {{- if $m.retention }}{{ $_ := set $o "compactor_blocks_retention_period" $m.retention }}{{ end }}
+      {{ $id }}:
+        {{- if $o }}
+        {{- toYaml $o | nindent 8 }}
+        {{- else }} {}
+        {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,16 @@
+# Hub profile: central multi-tenant stack. Combine with an environment file:
+#   helm upgrade --install observability . -n observability \
+#     -f profiles/hub.yaml -f environments/<env>/hub.yaml
+mode: hub
+
+gateway: { enabled: true }
+grafanaAccess: { enabled: true }
+alerting: { enabled: true }
+k6: { enabled: true }
+
+loki: { enabled: true }
+mimir: { enabled: true }
+grafana: { enabled: true }
+minio: { enabled: true }            # set false when using GCS/S3
+alloy: { enabled: true }            # hub self-monitoring -> tenant agent.tenant
+kube-state-metrics: { enabled: true }

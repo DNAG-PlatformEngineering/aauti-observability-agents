@@ -1,0 +1,13 @@
+.DS_Store
+.git/
+*.swp
+*.bak
+*.tmp
+*.orig
+.idea/
+.vscode/
+dashboards/src/
+docs/
+scripts/
+environments/
+profiles/
