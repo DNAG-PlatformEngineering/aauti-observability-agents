@@ -21,6 +21,10 @@ metadata:
   annotations:
     networking.gke.io/load-balancer-type: Internal
     networking.gke.io/internal-load-balancer-subnet: aauti-hub-vpc-as1-ingest-subnet
+    # The LB is in asia-south1; spokes in other regions (aauti-media-nonprod-gke,
+    # us-central1) can only reach it with global access. Still internal-only:
+    # source ranges below and VPC peering still apply.
+    networking.gke.io/internal-load-balancer-allow-global-access: "true"
 spec:
   type: LoadBalancer
   loadBalancerIP: 10.40.16.10
@@ -39,3 +43,6 @@ spec:
     # aauti-jitsi-nonprod-gke (project aauti-jitsi-noprod, VPC aauti-jitsi-nonprod-vpc)
     - 10.16.0.0/24     # node subnet aauti-jitsi-nonprod-gke-subnet
     - 10.17.0.0/17     # pod range (pod IPs are not masqueraded inside 10.0.0.0/8)
+    # aauti-media-nonprod-gke (project aauti-media-nonprod, VPC aauti-media-nonprod-vpc, us-central1)
+    - 10.24.0.0/24     # node subnet aauti-media-nonprod-gke-subnet
+    - 10.25.0.0/17     # pod range

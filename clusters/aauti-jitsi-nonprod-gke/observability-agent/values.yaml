@@ -1,4 +1,4 @@
-# Observability agent on aauti-jitsi-nonprod-gke (namespace "observability-agent").
+# Observability agent on aauti-jitsi-nonprod-gke (namespace "observability-agent-jitsinonprod").
 # Chart: ../../../charts/observability-stack (spoke mode), layered on its
 # profiles/spoke.yaml. Ships to the hub aauti-hub-as1-obs-gke, tenant "jitsi".
 #
@@ -9,8 +9,8 @@
 #   (10.40.16.10, subnet aauti-hub-vpc-as1-ingest-subnet), reached over the VPC
 #   peering jitsi-nonprod-to-hub / hub-to-jitsi-nonprod. Nothing is public.
 # - Security: TLS 1.2+ verified against the hub's private CA (Secret
-#   observability-hub-ca) with SNI observability-gateway.observability.svc,
-#   plus basic auth as tenant "jitsi" (Secret observability-agent-auth).
+#   observability-agent-jitsinonprod-hub-ca) with SNI observability-gateway.observability.svc,
+#   plus basic auth as tenant "jitsi" (Secret observability-agent-jitsinonprod-auth).
 #   Neither secret is stored in this repo; deploy.ps1 copies them from the hub.
 #
 # Tenant "jitsi" is shared by all Jitsi clusters; they are told apart by the
@@ -32,9 +32,14 @@ agent:
   # (-dev / -qa / -demo / -sandbox / -uat / -staging), else cluster.environment.
   environmentFromNamespace: { enabled: true }
   hubUrl: https://10.40.16.10
+  # Every name carries the cluster name, like the release and namespace. The
+  # alloy sub-chart can't template these, so they are repeated under alloy below.
+  configMapName: observability-agent-jitsinonprod-config
   auth:
-    existingSecret: true          # observability-agent-auth, created by deploy.ps1
+    existingSecret: true          # created by deploy.ps1
+    secretName: observability-agent-jitsinonprod-auth
   tls:
+    caSecretName: observability-agent-jitsinonprod-hub-ca
     # CA is passed at install time: --set-file agent.tls.caCert=<hub-ca.crt>
     serverName: observability-gateway.observability.svc
   namespaces: []                  # whole cluster
@@ -78,6 +83,10 @@ alloy:
     nodeSelector: { cloud.google.com/gke-nodepool: monitoring }
     tolerations:
       - { key: workload, operator: Equal, value: monitoring, effect: NoSchedule }
+    volumes:
+      extra:
+        - name: hub-ca
+          secret: { secretName: observability-agent-jitsinonprod-hub-ca, optional: true }   # = agent.tls.caSecretName
     volumeClaimTemplates:
       - metadata: { name: alloy-data }
         spec:
@@ -85,6 +94,13 @@ alloy:
           storageClassName: standard-rwo
           resources: { requests: { storage: 2Gi } }
   alloy:
+    configMap:
+      create: false
+      name: observability-agent-jitsinonprod-config   # = agent.configMapName
+      key: config.alloy
+    extraEnv:
+      - name: HUB_PASSWORD
+        valueFrom: { secretKeyRef: { name: observability-agent-jitsinonprod-auth, key: password } }   # = agent.auth.secretName
     resources:
       requests: { cpu: 100m, memory: 256Mi }
       limits: { memory: 1Gi }

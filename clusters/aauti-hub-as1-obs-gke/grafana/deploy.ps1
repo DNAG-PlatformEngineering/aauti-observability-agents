@@ -25,7 +25,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Tenants that have datasources in values.yaml (password key per tenant).
-$tenants = @("platform", "jitsi")
+$tenants = @("platform", "jitsi", "media")
 
 # Datasource credentials: copy each tenant password + the gateway CA from the
 # observability namespace (Secrets can't be read across namespaces). Re-running
@@ -54,6 +54,7 @@ if ($LASTEXITCODE -ne 0) { throw "creating grafana-hub-datasource failed" }
 $dashDir = Resolve-Path "$PSScriptRoot/../../../charts/observability-stack/dashboards"
 $dashboards = @{
   jitsi = @{ title = "Jitsi-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("workloads-logs") }   # cluster-health / resource-usage: Jitsi variants in dashboards/tenants/jitsi (+ per-environment rows)
+  media = @{ title = "Media-nonprod"; environments = "dev,qa,demo,sandbox,uat,staging"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
 }
 foreach ($t in $dashboards.Keys) {
   $tmp = Join-Path ([IO.Path]::GetTempPath()) "grafana-dashboards-$t"

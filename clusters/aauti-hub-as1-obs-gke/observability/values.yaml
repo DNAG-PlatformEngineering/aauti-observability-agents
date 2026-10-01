@@ -31,6 +31,18 @@ tenants:
     metrics:
       retention: 720h        # 30d
       limits: { ingestion_rate: 30000, ingestion_burst_size: 300000, max_global_series_per_user: 150000 }
+  media:
+    title: Media
+    # Spokes: aauti-media-nonprod-gke (us-central1, environment dev). Cluster
+    # is still empty (no workloads yet); same limits as jitsi until there is
+    # real volume to size from.
+    dashboards: [cluster-health, resource-usage, workloads-logs]
+    logs:
+      retention: 336h        # 14d
+      limits: { ingestion_rate_mb: 8, ingestion_burst_size_mb: 16, max_global_streams_per_user: 5000 }
+    metrics:
+      retention: 720h        # 30d
+      limits: { ingestion_rate: 30000, ingestion_burst_size: 300000, max_global_series_per_user: 150000 }
   platform:
     title: Platform
     dashboards: [cluster-health, resource-usage, workloads-logs, tenant-usage]

@@ -2,11 +2,11 @@
 # Changes nothing on either cluster. Usage: ./verify.ps1
 param(
   [string] $HubContext = "gke_aauti-hub_asia-south1-a_aauti-hub-as1-obs-gke",
-  [string] $SpokeContext = "gke_aauti-jitsi-noprod_asia-south1-a_aauti-jitsi-nonprod-gke",
-  [string] $Namespace = "observability-agent-jitsinonprod",
-  [string] $Release = "observability-agent-jitsinonprod",
-  [string] $Tenant = "jitsi",
-  [string] $Cluster = "aauti-jitsi-nonprod-gke",
+  [string] $SpokeContext = "gke_aauti-media-nonprod_us-central1-a_aauti-media-nonprod-gke",
+  [string] $Namespace = "observability-agent-medianonprod",
+  [string] $Release = "observability-agent-medianonprod",
+  [string] $Tenant = "media",
+  [string] $Cluster = "aauti-media-nonprod-gke",
   [string] $GatewayIp = "10.40.16.10",
   [string] $GrafanaUrl = "https://grafana.aauti.ai"
 )
@@ -22,7 +22,7 @@ function In-Cidr($ip, $cidr) {
 }
 
 Write-Host "== Private network path"
-foreach ($p in @(@("aauti-hub", "aauti-hub-vpc", "hub-to-jitsi-nonprod"), @("aauti-jitsi-noprod", "aauti-jitsi-nonprod-vpc", "jitsi-nonprod-to-hub"))) {
+foreach ($p in @(@("aauti-hub", "aauti-hub-vpc", "hub-to-media-nonprod"), @("aauti-media-nonprod", "aauti-media-nonprod-vpc", "media-nonprod-to-hub"))) {
   $state = (gcloud compute networks peerings list --network $p[1] --project $p[0] --format=json | ConvertFrom-Json).peerings |
     Where-Object name -eq $p[2] | ForEach-Object state
   Check ($state -eq "ACTIVE") "VPC peering $($p[2]) is ACTIVE ($state)"
@@ -31,6 +31,7 @@ $fr = gcloud compute forwarding-rules list --project aauti-hub --filter="IPAddre
 Check ($fr -and $fr[0].loadBalancingScheme -eq "INTERNAL") "gateway LB $GatewayIp is INTERNAL (scheme: $($fr[0].loadBalancingScheme))"
 $pub = gcloud compute forwarding-rules list --project aauti-hub --format="value(IPAddress,target)" | Select-String "observability-gateway"
 Check (-not $pub) "no external forwarding rule exposes the gateway"
+Check ($fr -and $fr[0].allowGlobalAccess) "gateway LB allows global access (spoke is in us-central1, LB in asia-south1)"
 $cfg = kubectl --context $SpokeContext -n $Namespace get configmap $Release-config -o jsonpath="{.data.config\.alloy}"
 $urls = [regex]::Matches($cfg, 'url\s*=\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value }
 Check ($urls.Count -ge 2 -and -not ($urls | Where-Object { $_ -notlike "https://$GatewayIp/*" })) "agent sends only to https://$GatewayIp ($($urls -join ', '))"
@@ -47,8 +48,8 @@ $gw = kubectl --context $HubContext -n observability logs deploy/observability-g
   Select-String "tenant=`"$Tenant`""
 Check ($gw.Count -gt 0) "hub gateway received $($gw.Count) authenticated '$Tenant' requests in 10m (TLS listener 8443)"
 $clients = $gw | ForEach-Object { if ($_ -match "client=(\S+)") { $Matches[1] } } | Sort-Object -Unique
-$foreign = $clients | Where-Object { -not ((In-Cidr $_ "10.16.0.0/24") -or (In-Cidr $_ "10.17.0.0/17")) }
-Check ($clients -and -not $foreign) "all '$Tenant' requests come from jitsi-nonprod private ranges ($($clients -join ', '))"
+$foreign = $clients | Where-Object { -not ((In-Cidr $_ "10.24.0.0/24") -or (In-Cidr $_ "10.25.0.0/17")) }
+Check ($clients -and -not $foreign) "all '$Tenant' requests come from media-nonprod private ranges ($($clients -join ', '))"
 $codes = $gw | ForEach-Object { if ($_ -match "status=(\d+)") { $Matches[1] } } | Group-Object | ForEach-Object { "$($_.Name)x$($_.Count)" }
 Check (-not ($codes -match "^(4|5)")) "gateway status codes for '$Tenant': $($codes -join ' ')"
 
@@ -61,13 +62,11 @@ try {
   $m = & $q "mimir-$Tenant" "api/v1/query" "count by (environment, namespace) ({cluster=`"$Cluster`"})"
   $ns = $m.data.result | ForEach-Object { "$($_.metric.namespace)=$($_.value[1])" }
   Check ($m.data.result.Count -gt 0) "metrics: series per namespace: $($ns -join ' ')"
-  Check (($m.data.result.metric.environment | Sort-Object -Unique) -contains "nonprod") "metrics carry environment=nonprod"
-  $j = & $q "mimir-$Tenant" "api/v1/query" "sum(jitsi_participants{cluster=`"$Cluster`"})"
-  Check ($j.data.result.Count -gt 0) "Jitsi app metrics present (JVB jitsi_participants)"
+  Check (($m.data.result.metric.environment | Sort-Object -Unique) -contains "dev") "metrics carry environment=dev"
   $l = & $q "loki-$Tenant" "loki/api/v1/query" "sum by (environment, namespace) (count_over_time({cluster=`"$Cluster`"}[10m]))"
   $lns = $l.data.result | ForEach-Object { "$($_.metric.namespace)=$($_.value[1])" }
   Check ($l.data.result.Count -gt 0) "logs: lines per namespace (10m): $($lns -join ' ')"
-  Check (($l.data.result.metric.environment | Sort-Object -Unique) -contains "nonprod") "logs carry environment=nonprod"
+  Check (($l.data.result.metric.environment | Sort-Object -Unique) -contains "dev") "logs carry environment=dev"
 } catch { Check $false "Grafana query failed: $($_.Exception.Message)" }
 
 Write-Host ""

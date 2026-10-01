@@ -44,7 +44,7 @@
 {{- fail "agent.hubUrl is required in spoke mode (e.g. https://observability.example.com)" }}
 {{- end }}
 {{- if and (not .Values.agent.auth.existingSecret) (not .Values.agent.auth.password) }}
-{{- fail "spoke mode needs agent.auth.password (or agent.auth.existingSecret=true with a Secret named observability-agent-auth)" }}
+{{- fail "spoke mode needs agent.auth.password (or agent.auth.existingSecret=true with a Secret named agent.auth.secretName)" }}
 {{- end }}
 {{- if and (not .Values.agent.tls.caCert) (not .Values.agent.tls.insecureSkipVerify) (not (hasPrefix "http://" .Values.agent.hubUrl)) }}
 {{- fail "agent.tls.caCert is required to verify the hub (or set agent.tls.insecureSkipVerify=true for throw-away tests)" }}

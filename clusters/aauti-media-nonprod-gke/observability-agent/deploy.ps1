@@ -1,33 +1,38 @@
 # Installs the observability agent (Alloy + kube-state-metrics) on
-# aauti-jitsi-nonprod-gke, namespace "observability-agent-jitsinonprod", shipping logs and
-# metrics to the hub (tenant "jitsi") over the private VPC peering.
+# aauti-media-nonprod-gke, namespace "observability-agent-medianonprod",
+# shipping logs and metrics to the hub (tenant "media") over the private VPC
+# peering.
 #
 # Prerequisites, in order (see ../README.md):
-#   1. ../../../network/aauti-jitsi-nonprod.ps1        (IP + peering)
-#   2. ../../aauti-hub-as1-obs-gke/observability/deploy.ps1  (tenant jitsi + internal LB)
+#   1. VPC peering media-nonprod-to-hub / hub-to-media-nonprod (already ACTIVE)
+#   2. ../../aauti-hub-as1-obs-gke/observability/deploy.ps1  (tenant media + internal LB)
 #   3. ../../aauti-hub-as1-obs-gke/grafana/deploy.ps1        (datasources + dashboards)
 #
-# Only creates new objects in the new namespace observability-agent-jitsinonprod (plus the
-# agent's ClusterRole/Binding for read access). Existing workloads, the
-# kube-prometheus-stack in "monitoring" and its CRDs are not modified.
+# Only creates new objects in the new namespace observability-agent-medianonprod
+# (plus the agent's ClusterRole/Binding for read access). Existing workloads
+# are not modified.
 # Usage: ./deploy.ps1          (run from the office network / VPN)
 param(
   [string] $HubContext = "gke_aauti-hub_asia-south1-a_aauti-hub-as1-obs-gke",
-  [string] $SpokeContext = "gke_aauti-jitsi-noprod_asia-south1-a_aauti-jitsi-nonprod-gke",
-  [string] $Namespace = "observability-agent-jitsinonprod",
-  [string] $Release = "observability-agent-jitsinonprod",
-  [string] $Tenant = "jitsi",
+  [string] $SpokeContext = "gke_aauti-media-nonprod_us-central1-a_aauti-media-nonprod-gke",
+  [string] $Namespace = "observability-agent-medianonprod",
+  [string] $Release = "observability-agent-medianonprod",
+  [string] $Tenant = "media",
   [string] $GatewayIp = "10.40.16.10"
 )
 $ErrorActionPreference = "Stop"
 $chart = Resolve-Path "$PSScriptRoot/../../../charts/observability-stack"
 
 # --- preflight: private path must exist before anything is installed --------
-$peer = gcloud compute networks peerings list --network aauti-jitsi-nonprod-vpc --project aauti-jitsi-noprod `
+$peer = gcloud compute networks peerings list --network aauti-media-nonprod-vpc --project aauti-media-nonprod `
   --format="csv[no-heading](peerings[].name,peerings[].state)" | Out-String
-if ($peer -notmatch "jitsi-nonprod-to-hub") { throw "VPC peering jitsi-nonprod-to-hub missing - run network/aauti-jitsi-nonprod.ps1" }
+if ($peer -notmatch "media-nonprod-to-hub") { throw "VPC peering media-nonprod-to-hub missing" }
 $lbIp = kubectl --context $HubContext -n observability get svc observability-gateway-internal -o jsonpath="{.status.loadBalancer.ingress[0].ip}"
 if ($lbIp -ne $GatewayIp) { throw "hub internal LB not ready (got '$lbIp', want $GatewayIp) - deploy hub observability first" }
+# The spoke is in us-central1, the LB in asia-south1.
+$global = kubectl --context $HubContext -n observability get svc observability-gateway-internal `
+  -o jsonpath="{.metadata.annotations.networking\.gke\.io/internal-load-balancer-allow-global-access}"
+if ($global -ne "true") { throw "hub internal LB has no global access - deploy hub observability first" }
 
 # --- credentials from the hub (never written to the repo) -------------------
 $pwB64 = kubectl --context $HubContext -n observability get secret observability-tenant-credentials -o jsonpath="{.data.$Tenant}"

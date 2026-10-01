@@ -1,6 +1,6 @@
 # Standalone Grafana for aauti-hub-as1-obs-gke, served at https://grafana.aauti.ai
 # Chart: grafana/grafana 10.5.15. Datasources: Loki + Mimir per tenant
-# (platform, jitsi). Dashboards: folder per tenant (currently Jitsi-nonprod).
+# (platform, jitsi, media). Dashboards: folder per tenant (Jitsi-nonprod, Media-nonprod).
 #
 # Exposure: GKE Ingress (external HTTPS LB) + Google-managed certificate on the
 # reserved global static IP "aauti-hub-vpc-as1-grafana-ip" (8.233.134.60).
@@ -127,6 +127,41 @@ datasources:
           basicAuthPassword: $__file{/etc/grafana/hub/jitsi}
           tlsCACert: $__file{/etc/grafana/hub/ca.crt}
           httpHeaderValue1: jitsi
+      # Tenant "media" (spokes: aauti-media-nonprod-gke). Same gateway, own
+      # credentials, so these datasources can only read Media data.
+      - name: Loki – Media
+        uid: loki-media
+        type: loki
+        access: proxy
+        url: https://observability-gateway.observability.svc:443
+        basicAuth: true
+        basicAuthUser: media
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          httpHeaderName1: X-Scope-OrgID
+          maxLines: 1000
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/media}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+          httpHeaderValue1: media
+      - name: Mimir – Media
+        uid: mimir-media
+        type: prometheus
+        access: proxy
+        url: https://observability-gateway.observability.svc:443/prometheus
+        basicAuth: true
+        basicAuthUser: media
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          httpHeaderName1: X-Scope-OrgID
+          prometheusType: Mimir
+          timeInterval: 60s
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/media}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+          httpHeaderValue1: media
 
 # Dashboards as code: one provider + folder per tenant. deploy.ps1 renders the
 # ConfigMap grafana-dashboards-<tenant> from charts/observability-stack/dashboards
@@ -144,8 +179,18 @@ dashboardProviders:
         allowUiUpdates: false
         options:
           path: /var/lib/grafana/dashboards/jitsi
+      - name: media
+        orgId: 1
+        folder: Media-nonprod
+        type: file
+        disableDeletion: true
+        editable: false
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/media
 dashboardsConfigMaps:
   jitsi: grafana-dashboards-jitsi
+  media: grafana-dashboards-media
 
 sidecar:
   datasources: { enabled: false }

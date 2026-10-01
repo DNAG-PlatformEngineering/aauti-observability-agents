@@ -20,7 +20,8 @@
   They're reachable only through `observability-gateway` (NGINX, TLS, one basic-auth user per tenant).
   The Service is ClusterIP, so the gateway is not exposed outside the cluster yet.
 - **Tenants:** `platform` (this cluster's own logs and metrics) and `jitsi` (spoke
-  [aauti-jitsi-nonprod-gke](../aauti-jitsi-nonprod-gke/README.md); prepared, not deployed yet).
+  [aauti-jitsi-nonprod-gke](../aauti-jitsi-nonprod-gke/README.md)) and `media` (spoke
+  [aauti-media-nonprod-gke](../aauti-media-nonprod-gke/README.md), us-central1; the internal LB has global access for it).
 - **Spoke ingest (private):** `observability-gateway-internal` ([gateway-internal-lb.yaml](observability/gateway-internal-lb.yaml))
   is an internal LB on 10.40.16.10 (ingest subnet) reached over VPC peering. It's source-ranged to each spoke's node and pod CIDRs.
   Spokes verify TLS with SNI `observability-gateway.observability.svc`, a SAN of the existing gateway certificate.

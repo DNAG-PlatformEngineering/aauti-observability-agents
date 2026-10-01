@@ -1,0 +1,89 @@
+# Observability agent on aauti-media-nonprod-gke (namespace
+# "observability-agent-medianonprod"). Chart: ../../../charts/observability-stack
+# (spoke mode), layered on its profiles/spoke.yaml. Ships to the hub
+# aauti-hub-as1-obs-gke, tenant "media".
+#
+# - Scope: every namespace of the cluster (logs + metrics + Kubernetes events).
+# - Labels on every series / log stream: cluster, environment, namespace, pod,
+#   container, node, app, job (+ log_type on logs).
+# - Transport: private only. hubUrl is the hub gateway's INTERNAL load balancer
+#   (10.40.16.10, asia-south1, global access on), reached from us-central1 over
+#   the existing VPC peering media-nonprod-to-hub / hub-to-media-nonprod.
+# - Security: TLS 1.2+ verified against the hub's private CA (Secret
+#   observability-agent-medianonprod-hub-ca) with SNI observability-gateway.observability.svc,
+#   plus basic auth as tenant "media" (Secret observability-agent-medianonprod-auth).
+#   Neither secret is stored in this repo; deploy.ps1 copies them from the hub.
+#
+# Tenant "media" is shared by all Media clusters; they are told apart by the
+# cluster / environment labels.
+
+cluster:
+  name: aauti-media-nonprod-gke
+  tier: nonprod
+  # Namespaces with an environment suffix (-dev, -qa, ...) get that
+  # environment; everything else (media-gateway, nodes) gets "dev".
+  environment: dev
+
+agent:
+  tenant: media
+  # Standard for every cluster: environment from the namespace suffix
+  # (-dev / -qa / -demo / -sandbox / -uat / -staging), else cluster.environment.
+  environmentFromNamespace: { enabled: true }
+  hubUrl: https://10.40.16.10
+  # Every name carries the cluster name, like the release and namespace. The
+  # alloy sub-chart can't template these, so they are repeated under alloy below.
+  configMapName: observability-agent-medianonprod-config
+  auth:
+    existingSecret: true          # created by deploy.ps1
+    secretName: observability-agent-medianonprod-auth
+  tls:
+    caSecretName: observability-agent-medianonprod-hub-ca
+    # CA is passed at install time: --set-file agent.tls.caCert=<hub-ca.crt>
+    serverName: observability-gateway.observability.svc
+  namespaces: []                  # whole cluster
+  metrics:
+    scrapeInterval: 60s
+    annotatedPods: true
+    kubeStateMetrics: { enabled: true }       # this release's own instance
+    # The cluster has no node-exporter (no kube-prometheus-stack); node CPU /
+    # memory come from kubelet + cAdvisor instead.
+    nodeExporter: { enabled: false }
+    # No monitoring.coreos.com CRDs on this cluster.
+    prometheusOperator: { enabled: false }
+  logs:
+    method: api                   # single agent tails every pod via the API
+    events: true
+    defaultLogType: application
+
+# One agent (StatefulSet) on the untainted "system" node pool. It tails logs
+# through the Kubernetes API, so it does not need to run on the "apps" nodes.
+# Switch to a DaemonSet with logs.method=file once media log volume is high.
+alloy:
+  controller:
+    type: statefulset
+    replicas: 1
+    nodeSelector: { cloud.google.com/gke-nodepool: system }
+    volumes:
+      extra:
+        - name: hub-ca
+          secret: { secretName: observability-agent-medianonprod-hub-ca, optional: true }   # = agent.tls.caSecretName
+    volumeClaimTemplates:
+      - metadata: { name: alloy-data }
+        spec:
+          accessModes: [ReadWriteOnce]
+          storageClassName: standard-rwo
+          resources: { requests: { storage: 2Gi } }
+  alloy:
+    configMap:
+      create: false
+      name: observability-agent-medianonprod-config   # = agent.configMapName
+      key: config.alloy
+    extraEnv:
+      - name: HUB_PASSWORD
+        valueFrom: { secretKeyRef: { name: observability-agent-medianonprod-auth, key: password } }   # = agent.auth.secretName
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 1Gi }
+
+kube-state-metrics:
+  nodeSelector: { cloud.google.com/gke-nodepool: system }

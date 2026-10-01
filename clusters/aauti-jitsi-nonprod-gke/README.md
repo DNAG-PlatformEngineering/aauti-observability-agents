@@ -11,12 +11,13 @@ clusters are onboarded the same way (see [Standard](#standard-for-the-next-clust
 | Hub | `aauti-hub-as1-obs-gke`, tenant **`jitsi`**, Grafana https://grafana.aauti.ai (folder **Jitsi**) |
 | Labels on all data | `cluster=aauti-jitsi-nonprod-gke`, `tier=nonprod`, `environment`, `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). **environment:** one Jitsi (`devvideo.aauti.com`) serves **dev, qa, demo and sandbox**, chosen per meeting by the room name (`<title>-<id>-aauti-<env>`, recordings `…-recording-<env>`). Infrastructure (pods, nodes, JVB load, all metrics) = `shared`. Log lines naming a room (web, prosody, jicofo, jvb, jibri `[finalize][<env>]`) = that meeting's env. |
 | Status | **Deployed** 2026-09-30. Grafana folder **Jitsi-nonprod**. |
+| Agent namespace / Helm release | `observability-agent-jitsinonprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. Renamed from `observability-agent` on 2026-10-01. |
 
 ## What gets deployed
 
 ```
 aauti-jitsi-nonprod-gke                                      aauti-hub-as1-obs-gke
- ns observability-agent (new)                                 ns observability
+ ns observability-agent-jitsinonprod (new)                     ns observability
  ┌───────────────────────────────┐   VPC peering (private)   ┌──────────────────────────────────┐
  │ Alloy (StatefulSet, 1 replica,│   HTTPS 443, TLS 1.2/1.3  │ observability-gateway-internal   │
  │  monitoring node pool)        │──────────────────────────▶│  internal LB 10.40.16.10         │
@@ -42,7 +43,7 @@ Jitsi release are **not modified**. The agent only *reads*:
 |---|---|
 | Private only | The agent's only destination is `https://10.40.16.10` (RFC 1918). That IP belongs to an **internal** passthrough LB in the hub VPC, reachable only over the peering `jitsi-nonprod-to-hub` ⇄ `hub-to-jitsi-nonprod`. There's no public IP, public DNS or internet path. The LB's firewall rule (created by GKE) only allows `10.16.0.0/24` and `10.17.0.0/17`. |
 | TLS | Gateway listens only on TLS (8443 → LB 443, TLSv1.2/1.3). The agent verifies the certificate against the hub's private CA (`ca_file`) with `server_name = observability-gateway.observability.svc`. `insecure_skip_verify` is off. |
-| Authentication | Basic auth per tenant (`jitsi`, bcrypt htpasswd on the gateway). The gateway derives `X-Scope-OrgID` from the user and returns 403 on a mismatch, so this cluster can only write or read tenant `jitsi`. The password lives only in Secrets: hub `observability-tenant-credentials`, spoke `observability-agent-auth`. |
+| Authentication | Basic auth per tenant (`jitsi`, bcrypt htpasswd on the gateway). The gateway derives `X-Scope-OrgID` from the user and returns 403 on a mismatch, so this cluster can only write or read tenant `jitsi`. The password lives only in Secrets: hub `observability-tenant-credentials`, spoke `observability-agent-jitsinonprod-auth`. |
 | Least privilege | Agent RBAC is read-only (get/list/watch; pods/log; nodes/metrics). Grafana's Jitsi datasources authenticate as `jitsi` and can't read `platform`. |
 
 ## Files
@@ -73,7 +74,7 @@ cd D:\aauti-observability
 # 3. Hub Grafana: Jitsi datasources + dashboards (Grafana pod restarts once).
 ./clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1
 
-# 4. Spoke: agent in the new namespace observability-agent.
+# 4. Spoke: agent in the new namespace observability-agent-jitsinonprod.
 ./clusters/aauti-jitsi-nonprod-gke/observability-agent/deploy.ps1
 
 # 5. Verify (read-only), after ~2 minutes.
@@ -82,8 +83,8 @@ cd D:\aauti-observability
 
 **Rollback** (in reverse order):
 ```powershell
-helm --kube-context gke_aauti-jitsi-noprod_asia-south1-a_aauti-jitsi-nonprod-gke -n observability-agent uninstall observability-agent
-kubectl --context gke_aauti-jitsi-noprod_asia-south1-a_aauti-jitsi-nonprod-gke delete namespace observability-agent
+helm --kube-context gke_aauti-jitsi-noprod_asia-south1-a_aauti-jitsi-nonprod-gke -n observability-agent-jitsinonprod uninstall observability-agent-jitsinonprod
+kubectl --context gke_aauti-jitsi-noprod_asia-south1-a_aauti-jitsi-nonprod-gke delete namespace observability-agent-jitsinonprod
 kubectl --context gke_aauti-hub_asia-south1-a_aauti-hub-as1-obs-gke -n observability delete svc observability-gateway-internal
 gcloud compute networks peerings delete jitsi-nonprod-to-hub --network aauti-jitsi-nonprod-vpc --project aauti-jitsi-noprod
 gcloud compute networks peerings delete hub-to-jitsi-nonprod --network aauti-hub-vpc --project aauti-hub
@@ -123,6 +124,7 @@ For each new cluster:
    - Add the spoke's node and pod ranges to `loadBalancerSourceRanges` in `gateway-internal-lb.yaml`.
 3. **Agent.** Copy `clusters/aauti-jitsi-nonprod-gke/observability-agent/` to `clusters/<gke-cluster-name>/observability-agent/`.
    - In `values.yaml`, change `cluster.name`, `cluster.environment` and `agent.tenant`, plus the node pool and tolerations.
+   - Namespace **and** Helm release = `observability-agent-<cluster without -gke and dashes>` (e.g. `observability-agent-medianonprod`). Set `$Namespace` / `$Release` in `deploy.ps1` and `verify.ps1`, and `agent.configMapName`, `agent.auth.secretName`, `agent.tls.caSecretName` plus the matching `alloy` entries in `values.yaml`, to that prefix.
    - Keep `hubUrl` / `serverName` as they are.
    - Enable `prometheusOperator` only if the app ships ServiceMonitors.
    - If the cluster has no node-exporter, set `agent.metrics.nodeExporter.enabled=false` or install one.

@@ -47,14 +47,20 @@ agent:
     # -- Password of `agent.tenant` on the hub gateway (spoke mode). Ignored in
     # hub mode (taken from the generated tenant credentials).
     password: ""
-    # -- Use a pre-created Secret instead (must be named
-    # observability-agent-auth, key `password`). Recommended for production.
+    # -- Use a pre-created Secret instead (named `secretName`, key
+    # `password`). Recommended for production.
     existingSecret: false
+    # -- Name of that Secret. When changed, also set the alloy sub-chart's
+    # HUB_PASSWORD secretKeyRef (alloy.alloy.extraEnv) to the same name.
+    secretName: observability-agent-auth
 
   tls:
     # -- PEM CA bundle that signed the hub gateway certificate (spoke mode).
     # Hub mode uses the chart generated / provided CA automatically.
     caCert: ""
+    # -- Name of the Secret holding caCert (spoke mode). When changed, also set
+    # the alloy sub-chart's hub-ca volume (alloy.controller.volumes.extra).
+    caSecretName: observability-hub-ca
     # -- Skip verification of the hub certificate. Never in production.
     insecureSkipVerify: false
     # -- Host name to verify the hub certificate against (TLS SNI) when
@@ -71,6 +77,10 @@ agent:
   environmentFromNamespace:
     enabled: false
     regex: "(?:.*-)?(dev|qa|demo|sandbox|uat|staging)"
+
+  # -- Name of the ConfigMap with the generated Alloy config. When changed,
+  # also set alloy.alloy.configMap.name to the same name.
+  configMapName: observability-agent-config
 
   # -- Restrict collection to these namespaces (empty = whole cluster). Used
   # locally to simulate several spoke clusters inside one Kubernetes cluster.

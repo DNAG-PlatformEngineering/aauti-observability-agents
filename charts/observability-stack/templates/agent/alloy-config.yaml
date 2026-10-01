@@ -20,7 +20,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: observability-agent-config
+  name: {{ .Values.agent.configMapName }}
   labels: {{- include "obs.labels" . | nindent 4 }}
 data:
   config.alloy: |
@@ -571,7 +571,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: observability-agent-auth
+  name: {{ .Values.agent.auth.secretName }}
   labels: {{- include "obs.labels" . | nindent 4 }}
 type: Opaque
 data:
@@ -582,7 +582,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: observability-hub-ca
+  name: {{ .Values.agent.tls.caSecretName }}
   labels: {{- include "obs.labels" . | nindent 4 }}
 type: Opaque
 data:
