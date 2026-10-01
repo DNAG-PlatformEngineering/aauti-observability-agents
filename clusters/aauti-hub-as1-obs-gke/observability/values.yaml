@@ -50,6 +50,22 @@ tenants:
     metrics:
       retention: 240h        # 10d
       limits: { ingestion_rate: 30000, ingestion_burst_size: 300000, max_global_series_per_user: 150000 }
+  platform-app:
+    title: Platform-app
+    # Spokes: aauti-platform-nonprod-as1-gke (11 apps x dev, qa, demo, sandbox;
+    # ~65 app pods). "platform" is taken by the hub's self-monitoring.
+    dashboards: [cluster-health, resource-usage, workloads-logs]
+    # Retention policy: dev + sandbox 7 days, qa + demo 10 days (same as media).
+    # Logs per environment; "shared" (kube-system, platform-gateway) 7d.
+    # Metrics: one retention per tenant in Mimir, so 10d for all.
+    logs:
+      retention: 168h        # 7d: dev, sandbox, shared
+      streamRetention:
+        - { selector: '{environment=~"qa|demo"}', priority: 1, period: 240h }   # 10d
+      limits: { ingestion_rate_mb: 10, ingestion_burst_size_mb: 20, max_global_streams_per_user: 10000 }
+    metrics:
+      retention: 240h        # 10d
+      limits: { ingestion_rate: 50000, ingestion_burst_size: 500000, max_global_series_per_user: 300000 }
   platform:
     title: Platform
     dashboards: [cluster-health, resource-usage, workloads-logs, tenant-usage]

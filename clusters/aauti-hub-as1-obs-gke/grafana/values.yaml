@@ -1,6 +1,7 @@
 # Standalone Grafana for aauti-hub-as1-obs-gke, served at https://grafana.aauti.ai
 # Chart: grafana/grafana 10.5.15. Datasources: Loki + Mimir per tenant
-# (platform, jitsi, media). Dashboards: folder per tenant (Jitsi-nonprod, Media-nonprod).
+# (platform, jitsi, media, platform-app). Dashboards: folder per tenant
+# (Jitsi-nonprod, Media-nonprod, Platform-nonprod).
 #
 # Exposure: GKE Ingress (external HTTPS LB) + Google-managed certificate on the
 # reserved global static IP "aauti-hub-vpc-as1-grafana-ip" (8.233.134.60).
@@ -162,6 +163,40 @@ datasources:
           basicAuthPassword: $__file{/etc/grafana/hub/media}
           tlsCACert: $__file{/etc/grafana/hub/ca.crt}
           httpHeaderValue1: media
+      # Tenant "platform-app" (spokes: aauti-platform-nonprod-as1-gke).
+      - name: Loki – Platform-app
+        uid: loki-platform-app
+        type: loki
+        access: proxy
+        url: https://observability-gateway.observability.svc:443
+        basicAuth: true
+        basicAuthUser: platform-app
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          httpHeaderName1: X-Scope-OrgID
+          maxLines: 1000
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/platform-app}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+          httpHeaderValue1: platform-app
+      - name: Mimir – Platform-app
+        uid: mimir-platform-app
+        type: prometheus
+        access: proxy
+        url: https://observability-gateway.observability.svc:443/prometheus
+        basicAuth: true
+        basicAuthUser: platform-app
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          httpHeaderName1: X-Scope-OrgID
+          prometheusType: Mimir
+          timeInterval: 60s
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/platform-app}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+          httpHeaderValue1: platform-app
 
 # Dashboards as code: one provider + folder per tenant. deploy.ps1 renders the
 # ConfigMap grafana-dashboards-<tenant> from charts/observability-stack/dashboards
@@ -188,9 +223,19 @@ dashboardProviders:
         allowUiUpdates: false
         options:
           path: /var/lib/grafana/dashboards/media
+      - name: platform-app
+        orgId: 1
+        folder: Platform-nonprod
+        type: file
+        disableDeletion: true
+        editable: false
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/platform-app
 dashboardsConfigMaps:
   jitsi: grafana-dashboards-jitsi
   media: grafana-dashboards-media
+  platform-app: grafana-dashboards-platform-app
 
 sidecar:
   datasources: { enabled: false }
