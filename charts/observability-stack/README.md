@@ -34,6 +34,10 @@ stack on the **hub** cluster and a lightweight collection agent on every
 | Object storage (GCS; MinIO locally) | `loki.loki.storage`, `mimir.mimir.structuredConfig.common.storage` |
 | Per-tenant usage monitoring + alerts | `tenant-usage` dashboard, `templates/hub/grafana-alerts.yaml` |
 | TLS spoke → hub | gateway TLS (generated CA, cert-manager or your Secret) |
+| Spoke → hub over an internal LB IP | `agent.hubUrl: https://<ip>` + `agent.tls.serverName` (a SAN of the gateway certificate) |
+| Agent object names per cluster | `agent.configMapName`, `agent.auth.secretName`, `agent.tls.caSecretName` (defaults `observability-agent-config`, `observability-agent-auth`, `observability-hub-ca`). When changed, repeat them in the alloy sub-chart: `alloy.alloy.configMap.name`, the `HUB_PASSWORD` entry of `alloy.alloy.extraEnv`, and the `hub-ca` volume in `alloy.controller.volumes.extra` (example: `clusters/aauti-media-nonprod-as1-gke/observability-agent/values.yaml`) |
+| Scrape existing ServiceMonitors / PodMonitors | `agent.metrics.prometheusOperator` |
+| Environment per namespace / per log line | `agent.environmentFromNamespace`, `agent.logs.environmentFromLine` |
 | Grafana users / RBAC | `grafanaAccess.users`; `grafanaAccess.isolation: orgs` gives each tenant its own Grafana organisation |
 | Alert routing | `alerting.webhook.url` or `alerting.contactPoints` / `policies` |
 | Dashboards as code | `dashboards/src/generate.py` → `dashboards/*.json` |

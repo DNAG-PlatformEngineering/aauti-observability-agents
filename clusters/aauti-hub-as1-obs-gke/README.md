@@ -25,7 +25,15 @@
   |---|---|---|---|---|
   | `platform` | this cluster | `observability` | — | deployed |
   | `jitsi` | [aauti-jitsi-nonprod-gke](../aauti-jitsi-nonprod-gke/README.md) (asia-south1-a) | `observability-agent-jitsinonprod` | Jitsi-nonprod | deployed |
-  | `media` | [aauti-media-nonprod-as1-gke](../aauti-media-nonprod-as1-gke/README.md) (asia-south1-a) | `observability-agent-medianonprod` | Media-nonprod | hub + Grafana deployed, agent not installed |
+  | `media` | [aauti-media-nonprod-as1-gke](../aauti-media-nonprod-as1-gke/README.md) (asia-south1-a) | `observability-agent-medianonprod` | Media-nonprod | deployed |
+- **Retention** (`observability/values.yaml`, per tenant):
+
+  | Tenant | Logs (Loki) | Metrics (Mimir) |
+  |---|---|---|
+  | `jitsi` | 7d, all environments | 7d |
+  | `media` | dev, sandbox, shared 7d; qa, demo 10d (`streamRetention` on `environment`) | 10d (Mimir has one retention per tenant, so qa/demo's 10d applies to all) |
+  | `platform` | 14d | 30d |
+
 - **Spoke ingest (private):** `observability-gateway-internal` ([gateway-internal-lb.yaml](observability/gateway-internal-lb.yaml))
   is an internal LB on 10.40.16.10 (ingest subnet) reached over VPC peering. It's source-ranged to each spoke's node and pod CIDRs
   (jitsi-nonprod 10.16.0.0/24 + 10.17.0.0/17, media-nonprod-as1 10.32.0.0/24 + 10.33.0.0/17). Global access is off, so only

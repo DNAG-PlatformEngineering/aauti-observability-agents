@@ -14,13 +14,14 @@ Second **spoke** of the hub observability stack, onboarded like
 | Workloads | `aauti-media-{api,dashboard,delivery,upload}-{dev,qa,demo,sandbox}`, `aauti-media-events`, `media-gateway` |
 | Agent namespace / Helm release | `observability-agent-medianonprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-media-nonprod-as1-gke`, `tier=nonprod`, `environment` (namespace suffix dev/qa/demo/sandbox, else `shared`), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs) |
-| Status | Hub + Grafana deployed. **Agent not installed yet.** |
+| Status | **Deployed** 2026-10-01 (hub, Grafana and agent; all `verify.ps1` checks pass). Grafana folder **Media-nonprod**. |
 
 The other cluster in this project, `aauti-media-nonprod-gke` (us-central1), is not onboarded.
 
 ## Differences from jitsi-nonprod
 
-- **No network script.** The peering already existed. Only the LB source ranges were added.
+- **Network.** The peering already existed, so [`../../network/aauti-media-nonprod.ps1`](../../network/aauti-media-nonprod.ps1) only checks it
+  (it would recreate it if missing). Only the LB source ranges were added.
 - **No node-exporter or Prometheus Operator** on this cluster, and no app pod has scrape annotations yet.
   Node metrics come from kubelet/cAdvisor only; annotated pods are picked up automatically later.
 - **Node pool.** The agent and kube-state-metrics run on `apps` (toleration `workload=apps`), because `system` is reserved for GKE.
@@ -30,7 +31,7 @@ The other cluster in this project, `aauti-media-nonprod-gke` (us-central1), is n
 
 | File | Applies to | What |
 |---|---|---|
-| [`../aauti-hub-as1-obs-gke/observability/values.yaml`](../aauti-hub-as1-obs-gke/observability/values.yaml) | hub | tenant `media` (limits, 14d logs / 30d metrics) |
+| [`../aauti-hub-as1-obs-gke/observability/values.yaml`](../aauti-hub-as1-obs-gke/observability/values.yaml) | hub | tenant `media` (limits; logs dev/sandbox/shared 7d, qa/demo 10d; metrics 10d) |
 | [`../aauti-hub-as1-obs-gke/observability/gateway-internal-lb.yaml`](../aauti-hub-as1-obs-gke/observability/gateway-internal-lb.yaml) | hub | node + pod ranges 10.32.0.0/24, 10.33.0.0/17 |
 | [`../aauti-hub-as1-obs-gke/grafana/values.yaml`](../aauti-hub-as1-obs-gke/grafana/values.yaml) + `deploy.ps1` | hub | `Loki – Media` / `Mimir – Media`, folder Media-nonprod |
 | [`observability-agent/values.yaml`](observability-agent/values.yaml) | this cluster | agent Helm values |

@@ -12,12 +12,12 @@ Secrets (admin passwords, tokens) live only in the cluster, never in this repo.
 |---|---|---|---|
 | [aauti-hub-as1-obs-gke](clusters/aauti-hub-as1-obs-gke/README.md) | Aauti-hub (`aauti-hub`) | asia-south1-a | Hub: Grafana, MinIO, Loki, Mimir, gateway (+ internal LB for spokes), Alloy, kube-state-metrics |
 | [aauti-jitsi-nonprod-gke](clusters/aauti-jitsi-nonprod-gke/README.md) | `aauti-jitsi-noprod` | asia-south1-a | Spoke (tenant `jitsi`): Alloy agent + kube-state-metrics in `observability-agent-jitsinonprod`. **Deployed**, Grafana folder *Jitsi-nonprod*. The README also defines the standard for onboarding the other clusters. |
-| [aauti-media-nonprod-as1-gke](clusters/aauti-media-nonprod-as1-gke/README.md) | `aauti-media-nonprod` | asia-south1-a | Spoke (tenant `media`): Alloy agent + kube-state-metrics in `observability-agent-medianonprod`. Hub side and Grafana folder *Media-nonprod* deployed; **agent not installed yet**. |
+| [aauti-media-nonprod-as1-gke](clusters/aauti-media-nonprod-as1-gke/README.md) | `aauti-media-nonprod` | asia-south1-a | Spoke (tenant `media`): Alloy agent + kube-state-metrics in `observability-agent-medianonprod`. **Deployed** 2026-10-01, Grafana folder *Media-nonprod*. |
 
 The same project's `aauti-media-nonprod-gke` (us-central1-a) is not onboarded.
 
-`network/` holds the VPC peering / internal IP scripts, one per spoke that needed a new peering
-(media-nonprod was already peered with the hub).
+`network/` holds the VPC peering / internal IP scripts, one per spoke VPC. They are idempotent and support `-WhatIf`
+(media-nonprod's peering already existed, so its script only checks it).
 
 ## Charts
 

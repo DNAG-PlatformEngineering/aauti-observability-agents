@@ -86,6 +86,9 @@ agent:
   auth: { existingSecret: true }
 ```
 
+The Secret name below is the default (`agent.auth.secretName`); the clusters in this repo use
+`observability-agent-<cluster>-auth` instead (see `clusters/*/observability-agent/`).
+
 ```bash
 kubectl --context payments-prod create namespace observability-agent
 kubectl --context payments-prod -n observability-agent create secret generic \

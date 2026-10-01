@@ -38,8 +38,11 @@ kubectl -n observability get secret observability-hub-ca -o jsonpath='{.data.ca\
 1. Set `tenants.<id>.password: <new>` (from your secret store) and run
    `helm upgrade` on the hub. NGINX reads htpasswd per request, so no restart
    is needed.
-2. Update `observability-agent-auth` on the spoke and restart its agent:
+2. Update `observability-agent-auth` (or the name in `agent.auth.secretName`) on the spoke and restart its agent:
    `kubectl -n observability-agent rollout restart statefulset/observability-agent-alloy` (or `daemonset/…` in per-node mode).
+   In this repo the names carry the cluster, e.g. on jitsi-nonprod: Secret `observability-agent-jitsinonprod-auth`,
+   `kubectl -n observability-agent-jitsinonprod rollout restart statefulset/observability-agent-jitsinonprod-alloy`.
+   The cluster's `observability-agent/deploy.ps1` does both (it re-copies the password from the hub).
 3. Grafana picks the new password up from the mounted Secret after its
    datasources reload (restart Grafana to force it).
 

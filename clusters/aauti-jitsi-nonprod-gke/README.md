@@ -51,7 +51,7 @@ Jitsi release are **not modified**. The agent only *reads*:
 | File | Applies to | What |
 |---|---|---|
 | [`../../network/aauti-jitsi-nonprod.ps1`](../../network/aauti-jitsi-nonprod.ps1) | both VPCs | reserves 10.40.16.10, creates both peerings (idempotent, supports `-WhatIf`) |
-| [`../aauti-hub-as1-obs-gke/observability/values.yaml`](../aauti-hub-as1-obs-gke/observability/values.yaml) | hub | adds tenant `jitsi` (limits, 14d logs / 30d metrics) |
+| [`../aauti-hub-as1-obs-gke/observability/values.yaml`](../aauti-hub-as1-obs-gke/observability/values.yaml) | hub | adds tenant `jitsi` (limits; retention 7d logs + metrics, all environments) |
 | [`../aauti-hub-as1-obs-gke/observability/gateway-internal-lb.yaml`](../aauti-hub-as1-obs-gke/observability/gateway-internal-lb.yaml) | hub | new internal LB Service (existing ClusterIP Service untouched) |
 | [`../aauti-hub-as1-obs-gke/grafana/values.yaml`](../aauti-hub-as1-obs-gke/grafana/values.yaml) + `deploy.ps1` | hub | Jitsi datasources and dashboard folder |
 | [`observability-agent/values.yaml`](observability-agent/values.yaml) | this cluster | agent Helm values |
@@ -119,7 +119,7 @@ For each new cluster:
    - Every other namespace, and the node metrics, get `cluster.environment`. Use the single environment for one-env clusters, and `shared` for multi-env clusters (jitsi-nonprod; media-nonprod-as1: `aauti-media-events`, `media-gateway`; platform-nonprod: `argocd`, `platform-gateway`).
 1. **Tenant.** Use one per product (`jitsi`, `media`, `platform-app`, …), not one per cluster. Prod and nonprod clusters of a product share the tenant and are separated by `environment` and `cluster` labels. Add the tenant to the hub `observability/values.yaml`, plus a datasource pair and dashboard provider in `grafana/values.yaml` and `deploy.ps1`.
 2. **Network.**
-   - Hub side: copy `network/aauti-jitsi-nonprod.ps1` and change the spoke project, VPC and peering names. Media and platform VPCs are already peered with the hub, so they need no script.
+   - Hub side: copy `network/aauti-jitsi-nonprod.ps1` and change the spoke project, VPC and peering names. Media and platform VPCs are already peered with the hub; for those, the script only checks the peering (see `network/aauti-media-nonprod.ps1`).
    - Spoke side: check the spoke's ranges don't overlap the hub or any VPC already peered with it.
    - Add the spoke's node and pod ranges to `loadBalancerSourceRanges` in `gateway-internal-lb.yaml`.
    - The LB is in asia-south1 without global access. For a spoke in another region, add

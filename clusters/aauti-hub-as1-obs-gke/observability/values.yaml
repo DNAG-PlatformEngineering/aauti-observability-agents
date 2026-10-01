@@ -25,22 +25,30 @@ tenants:
     # Prometheus (~90k series incl. control plane, ~3.4k samples/s); the agent
     # sends a filtered subset, so these leave >3x headroom.
     dashboards: [cluster-health, resource-usage, workloads-logs]
+    # Retention policy: all Jitsi data (every environment) 7 days.
     logs:
-      retention: 336h        # 14d
+      retention: 168h        # 7d
       limits: { ingestion_rate_mb: 8, ingestion_burst_size_mb: 16, max_global_streams_per_user: 5000 }
     metrics:
-      retention: 720h        # 30d
+      retention: 168h        # 7d
       limits: { ingestion_rate: 30000, ingestion_burst_size: 300000, max_global_series_per_user: 150000 }
   media:
     title: Media
     # Spokes: aauti-media-nonprod-as1-gke (dev, qa, demo, sandbox; ~34 app
     # pods). Same limits as jitsi until there is real volume to size from.
     dashboards: [cluster-health, resource-usage, workloads-logs]
+    # Retention policy: dev + sandbox 7 days, qa + demo 10 days.
+    # Logs: per environment (Loki retention_stream); everything else, incl.
+    # environment "shared" (kube-system, aauti-media-events, media-gateway), 7d.
+    # Metrics: Mimir only supports one retention per tenant, so 10d for all
+    # environments (qa / demo need 10d; dev / sandbox metrics are kept 10d too).
     logs:
-      retention: 336h        # 14d
+      retention: 168h        # 7d: dev, sandbox, shared
+      streamRetention:
+        - { selector: '{environment=~"qa|demo"}', priority: 1, period: 240h }   # 10d
       limits: { ingestion_rate_mb: 8, ingestion_burst_size_mb: 16, max_global_streams_per_user: 5000 }
     metrics:
-      retention: 720h        # 30d
+      retention: 240h        # 10d
       limits: { ingestion_rate: 30000, ingestion_burst_size: 300000, max_global_series_per_user: 150000 }
   platform:
     title: Platform
