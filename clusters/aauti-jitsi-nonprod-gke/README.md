@@ -8,7 +8,7 @@ clusters are onboarded the same way (see [Standard](#standard-for-the-next-clust
 | GCP project | `aauti-jitsi-noprod` |
 | Location | asia-south1-a (zonal) |
 | VPC | `aauti-jitsi-nonprod-vpc`: nodes 10.16.0.0/24, pods 10.17.0.0/17, services 10.18.0.0/22 |
-| Hub | `aauti-hub-as1-obs-gke`, tenant **`jitsi`**, Grafana https://grafana.aauti.ai (folder **Jitsi**) |
+| Hub | `aauti-hub-as1-obs-gke`, tenant **`jitsi`**, Grafana https://grafana.aauti.ai (folder **Jitsi-nonprod**) |
 | Labels on all data | `cluster=aauti-jitsi-nonprod-gke`, `tier=nonprod`, `environment`, `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). **environment:** one Jitsi (`devvideo.aauti.com`) serves **dev, qa, demo and sandbox**, chosen per meeting by the room name (`<title>-<id>-aauti-<env>`, recordings `…-recording-<env>`). Infrastructure (pods, nodes, JVB load, all metrics) = `shared`. Log lines naming a room (web, prosody, jicofo, jvb, jibri `[finalize][<env>]`) = that meeting's env. |
 | Status | **Deployed** 2026-09-30. Grafana folder **Jitsi-nonprod**. |
 | Agent namespace / Helm release | `observability-agent-jitsinonprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. Renamed from `observability-agent` on 2026-10-01. |
@@ -28,7 +28,7 @@ aauti-jitsi-nonprod-gke                                      aauti-hub-as1-obs-g
  │  • node-exporter (existing)   │                           │                                  │
  │  • JVB (pod annotations)      │                           │ ns grafana: Grafana              │
  │  • Prosody, Jicofo (existing  │                           │  "Loki – Jitsi" / "Mimir – Jitsi"│
- │    ServiceMonitor/PodMonitor) │                           │  folder Jitsi: 4 dashboards      │
+ │    ServiceMonitor/PodMonitor) │                           │  folder Jitsi-nonprod: 4 dashbds │
  └───────────────────────────────┘                           └──────────────────────────────────┘
 ```
 
@@ -62,7 +62,7 @@ Jitsi release are **not modified**. The agent only *reads*:
 ## Rollout (run from the office network / VPN, in this order)
 
 ```powershell
-cd D:\aauti-observability
+cd D:\aauti-observability-agents
 
 # 1. Network: static internal IP + VPC peering (both projects). Dry run first.
 ./network/aauti-jitsi-nonprod.ps1 -WhatIf
@@ -97,17 +97,17 @@ Every dashboard has **Environment → Cluster → Namespace** selectors. Namespa
 logs follow the Environment selector. Node-level panels are per cluster, because nodes are shared
 by all environments of a cluster.
 
-- **Jitsi / Cluster health**: nodes, pods, restarts, degraded deployments, warning events
-- **Jitsi / Resource usage**: CPU, memory and network by namespace, pod and node; PVC usage
-- **Jitsi / Workloads & logs**: log volume, errors by app, log search across all namespaces
-- **Jitsi / Jitsi Meet**:
+- **Jitsi-nonprod / Cluster health**: nodes, pods, restarts, degraded deployments, warning events
+- **Jitsi-nonprod / Resource usage**: CPU, memory and network by namespace, pod and node; PVC usage
+- **Jitsi-nonprod / Workloads & logs**: log volume, errors by app, log search across all namespaces
+- **Jitsi-nonprod / Jitsi Meet**:
   - JVB: conferences, participants, stress, bitrate, loss, RTT, ICE
   - Jicofo: bridges, Jibri availability, recordings
   - Prosody: sessions, token auth
   - `jitsi` namespace logs
 
 Raw queries: *Explore* → `Loki – Jitsi` (e.g. `{cluster="aauti-jitsi-nonprod-gke", namespace="jitsi"}`)
-or `Mimir – Jitsi` (e.g. `jitsi_participants{environment="nonprod"}`).
+or `Mimir – Jitsi` (e.g. `jitsi_participants{tier="nonprod"}`).
 
 ## Standard for the next clusters
 
@@ -116,17 +116,22 @@ For each new cluster:
 0. **Labels.** Every cluster sets `cluster.name`, `cluster.tier` (`prod` / `nonprod`) and
    `cluster.environment`, and enables `agent.environmentFromNamespace`.
    - Namespaces ending in `-dev`, `-qa`, `-demo`, `-sandbox`, `-uat` or `-staging` get that environment. For example, `aauti-api-qa` becomes `environment=qa` on platform-nonprod.
-   - Every other namespace, and the node metrics, get `cluster.environment`. Use the single environment for one-env clusters (jitsi-nonprod: `dev`), and `shared` for multi-env clusters (platform-nonprod: `argocd`, `platform-gateway`).
+   - Every other namespace, and the node metrics, get `cluster.environment`. Use the single environment for one-env clusters, and `shared` for multi-env clusters (jitsi-nonprod; media-nonprod-as1: `aauti-media-events`, `media-gateway`; platform-nonprod: `argocd`, `platform-gateway`).
 1. **Tenant.** Use one per product (`jitsi`, `media`, `platform-app`, …), not one per cluster. Prod and nonprod clusters of a product share the tenant and are separated by `environment` and `cluster` labels. Add the tenant to the hub `observability/values.yaml`, plus a datasource pair and dashboard provider in `grafana/values.yaml` and `deploy.ps1`.
 2. **Network.**
-   - Hub side: copy `network/aauti-jitsi-nonprod.ps1` and change the spoke project, VPC and peering names. Media and platform VPCs are already peered with the hub.
+   - Hub side: copy `network/aauti-jitsi-nonprod.ps1` and change the spoke project, VPC and peering names. Media and platform VPCs are already peered with the hub, so they need no script.
    - Spoke side: check the spoke's ranges don't overlap the hub or any VPC already peered with it.
    - Add the spoke's node and pod ranges to `loadBalancerSourceRanges` in `gateway-internal-lb.yaml`.
+   - The LB is in asia-south1 without global access. For a spoke in another region, add
+     `networking.gke.io/internal-load-balancer-allow-global-access: "true"` to that Service.
 3. **Agent.** Copy `clusters/aauti-jitsi-nonprod-gke/observability-agent/` to `clusters/<gke-cluster-name>/observability-agent/`.
    - In `values.yaml`, change `cluster.name`, `cluster.environment` and `agent.tenant`, plus the node pool and tolerations.
+     Don't use a pool tainted `components.gke.io/gke-managed-components` (reserved for GKE).
+   - In `verify.ps1`, change the contexts, peering names, node / pod ranges and the expected `environment`.
    - Namespace **and** Helm release = `observability-agent-<cluster without -gke and dashes>` (e.g. `observability-agent-jitsinonprod`; `aauti-media-nonprod-as1-gke` uses `observability-agent-medianonprod`, the only media nonprod cluster with an agent). Set `$Namespace` / `$Release` in `deploy.ps1` and `verify.ps1`, and `agent.configMapName`, `agent.auth.secretName`, `agent.tls.caSecretName` plus the matching `alloy` entries in `values.yaml`, to that prefix.
    - Keep `hubUrl` / `serverName` as they are.
    - Enable `prometheusOperator` only if the app ships ServiceMonitors.
    - If the cluster has no node-exporter, set `agent.metrics.nodeExporter.enabled=false` or install one.
    - For very high log volume, switch to `alloy.controller.type: daemonset` with `logs.method: file` (example: `D:\k6s\observability-stack\environments\prod-example\spoke-media.yaml`).
 4. **Roll out** in the same order: network → hub → Grafana → agent → `verify.ps1`.
+5. **Docs.** Add the cluster to the tables in the root `README.md` and the hub README.

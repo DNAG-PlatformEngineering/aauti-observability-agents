@@ -18,15 +18,23 @@
 - **Storage:** in-cluster MinIO (50Gi PVC) holds Loki and Mimir data. No GCS buckets yet.
 - **Loki** (SingleBinary, 20Gi) and **Mimir** (1 replica per component, RF 1) are multi-tenant.
   They're reachable only through `observability-gateway` (NGINX, TLS, one basic-auth user per tenant).
-  The Service is ClusterIP, so the gateway is not exposed outside the cluster yet.
-- **Tenants:** `platform` (this cluster's own logs and metrics) and `jitsi` (spoke
-  [aauti-jitsi-nonprod-gke](../aauti-jitsi-nonprod-gke/README.md)) and `media` (spoke
-  [aauti-media-nonprod-as1-gke](../aauti-media-nonprod-as1-gke/README.md)).
+  The chart's Service is ClusterIP (used by Grafana); spokes come in through the internal LB below.
+- **Tenants:**
+
+  | Tenant | Source | Agent namespace | Grafana folder | Status |
+  |---|---|---|---|---|
+  | `platform` | this cluster | `observability` | — | deployed |
+  | `jitsi` | [aauti-jitsi-nonprod-gke](../aauti-jitsi-nonprod-gke/README.md) (asia-south1-a) | `observability-agent-jitsinonprod` | Jitsi-nonprod | deployed |
+  | `media` | [aauti-media-nonprod-as1-gke](../aauti-media-nonprod-as1-gke/README.md) (asia-south1-a) | `observability-agent-medianonprod` | Media-nonprod | hub + Grafana deployed, agent not installed |
 - **Spoke ingest (private):** `observability-gateway-internal` ([gateway-internal-lb.yaml](observability/gateway-internal-lb.yaml))
-  is an internal LB on 10.40.16.10 (ingest subnet) reached over VPC peering. It's source-ranged to each spoke's node and pod CIDRs.
+  is an internal LB on 10.40.16.10 (ingest subnet) reached over VPC peering. It's source-ranged to each spoke's node and pod CIDRs
+  (jitsi-nonprod 10.16.0.0/24 + 10.17.0.0/17, media-nonprod-as1 10.32.0.0/24 + 10.33.0.0/17). Global access is off, so only
+  spokes in asia-south1 can reach it; a spoke in another region needs the annotation
+  `networking.gke.io/internal-load-balancer-allow-global-access: "true"`.
   Spokes verify TLS with SNI `observability-gateway.observability.svc`, a SAN of the existing gateway certificate.
 - **Alloy + kube-state-metrics** collect this whole cluster into tenant `platform`.
-- **Grafana datasources:** `Loki – Jitsi` / `Mimir – Jitsi` (user `jitsi`, dashboards in folder *Jitsi*) work the same way as the platform pair below.
+- **Grafana datasources:** `Loki – Jitsi` / `Mimir – Jitsi` (user `jitsi`, folder *Jitsi-nonprod*) and `Loki – Media` / `Mimir – Media`
+  (user `media`, folder *Media-nonprod*) work the same way as the platform pair below. Each pair can only read its own tenant.
   `Loki – Platform` and `Mimir – Platform` (the default) connect over HTTPS to
   `observability-gateway.observability.svc` and verify the gateway CA. They use basic auth `platform` and send `X-Scope-OrgID: platform`.
   `grafana/deploy.ps1` copies the password and CA into Secret `grafana-hub-datasource`, so run it again after rotating either.
