@@ -1,4 +1,4 @@
-# Observability agent on aauti-media-nonprod-gke (namespace
+# Observability agent on aauti-media-nonprod-as1-gke (namespace
 # "observability-agent-medianonprod"). Chart: ../../../charts/observability-stack
 # (spoke mode), layered on its profiles/spoke.yaml. Ships to the hub
 # aauti-hub-as1-obs-gke, tenant "media".
@@ -7,8 +7,8 @@
 # - Labels on every series / log stream: cluster, environment, namespace, pod,
 #   container, node, app, job (+ log_type on logs).
 # - Transport: private only. hubUrl is the hub gateway's INTERNAL load balancer
-#   (10.40.16.10, asia-south1, global access on), reached from us-central1 over
-#   the existing VPC peering media-nonprod-to-hub / hub-to-media-nonprod.
+#   (10.40.16.10, same region asia-south1), reached over the existing VPC
+#   peering media-nonprod-to-hub / hub-to-media-nonprod.
 # - Security: TLS 1.2+ verified against the hub's private CA (Secret
 #   observability-agent-medianonprod-hub-ca) with SNI observability-gateway.observability.svc,
 #   plus basic auth as tenant "media" (Secret observability-agent-medianonprod-auth).
@@ -18,11 +18,12 @@
 # cluster / environment labels.
 
 cluster:
-  name: aauti-media-nonprod-gke
+  name: aauti-media-nonprod-as1-gke
   tier: nonprod
-  # Namespaces with an environment suffix (-dev, -qa, ...) get that
-  # environment; everything else (media-gateway, nodes) gets "dev".
-  environment: dev
+  # One cluster for dev, qa, demo and sandbox (aauti-media-<app>-<env>
+  # namespaces get that environment from the suffix). Shared namespaces
+  # (aauti-media-events, media-gateway, kube-system) and nodes are "shared".
+  environment: shared
 
 agent:
   tenant: media
@@ -46,7 +47,8 @@ agent:
     annotatedPods: true
     kubeStateMetrics: { enabled: true }       # this release's own instance
     # The cluster has no node-exporter (no kube-prometheus-stack); node CPU /
-    # memory come from kubelet + cAdvisor instead.
+    # memory come from kubelet + cAdvisor instead. No app pod has
+    # prometheus.io/scrape annotations yet; annotatedPods picks them up later.
     nodeExporter: { enabled: false }
     # No monitoring.coreos.com CRDs on this cluster.
     prometheusOperator: { enabled: false }
@@ -55,14 +57,17 @@ agent:
     events: true
     defaultLogType: application
 
-# One agent (StatefulSet) on the untainted "system" node pool. It tails logs
-# through the Kubernetes API, so it does not need to run on the "apps" nodes.
-# Switch to a DaemonSet with logs.method=file once media log volume is high.
+# One agent (StatefulSet) on the "apps" node pool: the "system" pool is
+# reserved for GKE's own components (taint components.gke.io/gke-managed-components).
+# It tails logs through the Kubernetes API, so it does not need to run on every
+# node. Switch to a DaemonSet with logs.method=file once media log volume is high.
 alloy:
   controller:
     type: statefulset
     replicas: 1
-    nodeSelector: { cloud.google.com/gke-nodepool: system }
+    nodeSelector: { cloud.google.com/gke-nodepool: apps }
+    tolerations:
+      - { key: workload, operator: Equal, value: apps, effect: NoSchedule }
     volumes:
       extra:
         - name: hub-ca
@@ -86,4 +91,6 @@ alloy:
       limits: { memory: 1Gi }
 
 kube-state-metrics:
-  nodeSelector: { cloud.google.com/gke-nodepool: system }
+  nodeSelector: { cloud.google.com/gke-nodepool: apps }
+  tolerations:
+    - { key: workload, operator: Equal, value: apps, effect: NoSchedule }

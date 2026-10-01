@@ -1,5 +1,5 @@
 # Installs the observability agent (Alloy + kube-state-metrics) on
-# aauti-media-nonprod-gke, namespace "observability-agent-medianonprod",
+# aauti-media-nonprod-as1-gke, namespace "observability-agent-medianonprod",
 # shipping logs and metrics to the hub (tenant "media") over the private VPC
 # peering.
 #
@@ -14,7 +14,7 @@
 # Usage: ./deploy.ps1          (run from the office network / VPN)
 param(
   [string] $HubContext = "gke_aauti-hub_asia-south1-a_aauti-hub-as1-obs-gke",
-  [string] $SpokeContext = "gke_aauti-media-nonprod_us-central1-a_aauti-media-nonprod-gke",
+  [string] $SpokeContext = "gke_aauti-media-nonprod_asia-south1-a_aauti-media-nonprod-as1-gke",
   [string] $Namespace = "observability-agent-medianonprod",
   [string] $Release = "observability-agent-medianonprod",
   [string] $Tenant = "media",
@@ -29,10 +29,8 @@ $peer = gcloud compute networks peerings list --network aauti-media-nonprod-vpc 
 if ($peer -notmatch "media-nonprod-to-hub") { throw "VPC peering media-nonprod-to-hub missing" }
 $lbIp = kubectl --context $HubContext -n observability get svc observability-gateway-internal -o jsonpath="{.status.loadBalancer.ingress[0].ip}"
 if ($lbIp -ne $GatewayIp) { throw "hub internal LB not ready (got '$lbIp', want $GatewayIp) - deploy hub observability first" }
-# The spoke is in us-central1, the LB in asia-south1.
-$global = kubectl --context $HubContext -n observability get svc observability-gateway-internal `
-  -o jsonpath="{.metadata.annotations.networking\.gke\.io/internal-load-balancer-allow-global-access}"
-if ($global -ne "true") { throw "hub internal LB has no global access - deploy hub observability first" }
+$ranges = kubectl --context $HubContext -n observability get svc observability-gateway-internal -o jsonpath="{.spec.loadBalancerSourceRanges}"
+if ($ranges -notmatch "10\.33\.0\.0/17") { throw "hub internal LB does not allow this cluster's pod range - deploy hub observability first" }
 
 # --- credentials from the hub (never written to the repo) -------------------
 $pwB64 = kubectl --context $HubContext -n observability get secret observability-tenant-credentials -o jsonpath="{.data.$Tenant}"

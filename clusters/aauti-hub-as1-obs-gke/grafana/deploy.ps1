@@ -54,7 +54,7 @@ if ($LASTEXITCODE -ne 0) { throw "creating grafana-hub-datasource failed" }
 $dashDir = Resolve-Path "$PSScriptRoot/../../../charts/observability-stack/dashboards"
 $dashboards = @{
   jitsi = @{ title = "Jitsi-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("workloads-logs") }   # cluster-health / resource-usage: Jitsi variants in dashboards/tenants/jitsi (+ per-environment rows)
-  media = @{ title = "Media-nonprod"; environments = "dev,qa,demo,sandbox,uat,staging"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
+  media = @{ title = "Media-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
 }
 foreach ($t in $dashboards.Keys) {
   $tmp = Join-Path ([IO.Path]::GetTempPath()) "grafana-dashboards-$t"

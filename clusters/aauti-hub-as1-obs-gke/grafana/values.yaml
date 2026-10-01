@@ -127,7 +127,7 @@ datasources:
           basicAuthPassword: $__file{/etc/grafana/hub/jitsi}
           tlsCACert: $__file{/etc/grafana/hub/ca.crt}
           httpHeaderValue1: jitsi
-      # Tenant "media" (spokes: aauti-media-nonprod-gke). Same gateway, own
+      # Tenant "media" (spokes: aauti-media-nonprod-as1-gke). Same gateway, own
       # credentials, so these datasources can only read Media data.
       - name: Loki – Media
         uid: loki-media

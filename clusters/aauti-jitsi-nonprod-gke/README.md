@@ -124,7 +124,7 @@ For each new cluster:
    - Add the spoke's node and pod ranges to `loadBalancerSourceRanges` in `gateway-internal-lb.yaml`.
 3. **Agent.** Copy `clusters/aauti-jitsi-nonprod-gke/observability-agent/` to `clusters/<gke-cluster-name>/observability-agent/`.
    - In `values.yaml`, change `cluster.name`, `cluster.environment` and `agent.tenant`, plus the node pool and tolerations.
-   - Namespace **and** Helm release = `observability-agent-<cluster without -gke and dashes>` (e.g. `observability-agent-medianonprod`). Set `$Namespace` / `$Release` in `deploy.ps1` and `verify.ps1`, and `agent.configMapName`, `agent.auth.secretName`, `agent.tls.caSecretName` plus the matching `alloy` entries in `values.yaml`, to that prefix.
+   - Namespace **and** Helm release = `observability-agent-<cluster without -gke and dashes>` (e.g. `observability-agent-jitsinonprod`; `aauti-media-nonprod-as1-gke` uses `observability-agent-medianonprod`, the only media nonprod cluster with an agent). Set `$Namespace` / `$Release` in `deploy.ps1` and `verify.ps1`, and `agent.configMapName`, `agent.auth.secretName`, `agent.tls.caSecretName` plus the matching `alloy` entries in `values.yaml`, to that prefix.
    - Keep `hubUrl` / `serverName` as they are.
    - Enable `prometheusOperator` only if the app ships ServiceMonitors.
    - If the cluster has no node-exporter, set `agent.metrics.nodeExporter.enabled=false` or install one.

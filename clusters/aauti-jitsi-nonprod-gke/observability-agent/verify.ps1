@@ -39,13 +39,13 @@ Write-Host "`n== TLS + authentication"
 Check ($cfg -notmatch "insecure_skip_verify\s*=\s*true") "agent verifies the hub certificate (no insecure_skip_verify)"
 Check ($cfg -match 'server_name\s*=\s*"observability-gateway.observability.svc"' -and $cfg -match "ca_file") "agent pins hub CA + SNI observability-gateway.observability.svc"
 $agentLog = kubectl --context $SpokeContext -n $Namespace logs statefulset/$Release-alloy --since=15m 2>&1 | Out-String
-foreach ($pat in @("x509", "certificate", "401", "403", "429", "connection refused", "i/o timeout")) {
+foreach ($pat in @("x509", "certificate", "status=401", "status=403", "status=429", "connection refused", "i/o timeout")) {
   $n = ([regex]::Matches($agentLog, [regex]::Escape($pat))).Count
   Check ($n -eq 0) "agent log (15m) has no '$pat' errors ($n)"
 }
 $gw = kubectl --context $HubContext -n observability logs deploy/observability-gateway --since=10m 2>&1 |
-  Select-String "tenant=`"$Tenant`""
-Check ($gw.Count -gt 0) "hub gateway received $($gw.Count) authenticated '$Tenant' requests in 10m (TLS listener 8443)"
+  Select-String "tenant=`"$Tenant`".*path=`"[^`"]*/push`""   # ingest only; Grafana's queries come from the hub's own pods
+Check ($gw.Count -gt 0) "hub gateway received $($gw.Count) authenticated '$Tenant' push requests in 10m (TLS listener 8443)"
 $clients = $gw | ForEach-Object { if ($_ -match "client=(\S+)") { $Matches[1] } } | Sort-Object -Unique
 $foreign = $clients | Where-Object { -not ((In-Cidr $_ "10.16.0.0/24") -or (In-Cidr $_ "10.17.0.0/17")) }
 Check ($clients -and -not $foreign) "all '$Tenant' requests come from jitsi-nonprod private ranges ($($clients -join ', '))"
@@ -61,13 +61,15 @@ try {
   $m = & $q "mimir-$Tenant" "api/v1/query" "count by (environment, namespace) ({cluster=`"$Cluster`"})"
   $ns = $m.data.result | ForEach-Object { "$($_.metric.namespace)=$($_.value[1])" }
   Check ($m.data.result.Count -gt 0) "metrics: series per namespace: $($ns -join ' ')"
-  Check (($m.data.result.metric.environment | Sort-Object -Unique) -contains "nonprod") "metrics carry environment=nonprod"
+  Check (($m.data.result.metric.environment | Sort-Object -Unique) -contains "shared") "metrics carry environment=shared (all: $(($m.data.result.metric.environment | Sort-Object -Unique) -join ','))"
   $j = & $q "mimir-$Tenant" "api/v1/query" "sum(jitsi_participants{cluster=`"$Cluster`"})"
   Check ($j.data.result.Count -gt 0) "Jitsi app metrics present (JVB jitsi_participants)"
+  $t = & $q "mimir-$Tenant" "api/v1/query" "count({cluster=`"$Cluster`", tier=`"nonprod`"})"
+  Check ($t.data.result.Count -gt 0) "metrics carry tier=nonprod"
   $l = & $q "loki-$Tenant" "loki/api/v1/query" "sum by (environment, namespace) (count_over_time({cluster=`"$Cluster`"}[10m]))"
   $lns = $l.data.result | ForEach-Object { "$($_.metric.namespace)=$($_.value[1])" }
   Check ($l.data.result.Count -gt 0) "logs: lines per namespace (10m): $($lns -join ' ')"
-  Check (($l.data.result.metric.environment | Sort-Object -Unique) -contains "nonprod") "logs carry environment=nonprod"
+  Check (($l.data.result.metric.environment | Sort-Object -Unique) -contains "shared") "logs carry environment=shared (all: $(($l.data.result.metric.environment | Sort-Object -Unique) -join ','))"
 } catch { Check $false "Grafana query failed: $($_.Exception.Message)" }
 
 Write-Host ""
