@@ -61,6 +61,9 @@ Deploy / upgrade:
 
 ## Grafana
 
+- Grafana 12.3.1 (OSS). Local accounts only: sign-up and anonymous access are off, new users get Viewer
+  (Explore needs Editor or Admin). The chart's `grafana`, `grafanaAccess` and `alerting` are disabled in
+  `observability/values.yaml`, so there are no tenant teams, no *Tenant usage* dashboard and no usage alerts yet.
 - Exposed with GKE Ingress on the global static IP `aauti-hub-vpc-as1-grafana-ip` (8.233.134.60) and a
   Google-managed certificate (`grafana-cert`); HTTP redirects to HTTPS.
 - DNS: Cloudflare A record `grafana.aauti.ai` → 8.233.134.60.

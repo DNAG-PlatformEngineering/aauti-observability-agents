@@ -1,5 +1,11 @@
 # Deployment
 
+> **In this repo** the commands below refer to the POC's `scripts/` and `environments/`, which
+> aren't copied here. Deploy with `clusters/aauti-hub-as1-obs-gke/{observability,grafana}/deploy.ps1`
+> and `clusters/<spoke>/observability-agent/deploy.ps1`. Spoke namespace and release are
+> `observability-agent-<cluster>` (e.g. `observability-agent-medianonprod`), not `observability-agent`.
+> The *Production (GKE + GCS)* steps aren't done yet: the hub uses MinIO, single replicas, RF 1.
+
 ## Values layering
 
 ```

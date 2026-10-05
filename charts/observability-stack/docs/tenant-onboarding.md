@@ -1,5 +1,10 @@
 # Onboarding a new spoke / tenant
 
+> **In this repo** follow *Standard for the next clusters* in
+> `clusters/aauti-jitsi-nonprod-gke/README.md` instead: it uses the per-cluster `deploy.ps1` /
+> `verify.ps1`, the internal LB `gateway-internal-lb.yaml`, and adds the datasources and dashboard
+> folder to the standalone Grafana. `scripts/onboard-spoke.ps1` and `environments/` are POC-only.
+
 Example: a new **Payments** cluster. Tenant id `payments`, cluster name
 `payments-prod`.
 

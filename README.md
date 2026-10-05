@@ -11,15 +11,14 @@ Secrets (admin passwords, tokens) live only in the cluster, never in this repo.
 | Cluster | Project | Zone | What's deployed |
 |---|---|---|---|
 | [aauti-hub-as1-obs-gke](clusters/aauti-hub-as1-obs-gke/README.md) | Aauti-hub (`aauti-hub`) | asia-south1-a | Hub: Grafana, MinIO, Loki, Mimir, gateway (+ internal LB for spokes), Alloy, kube-state-metrics |
-| [aauti-jitsi-nonprod-gke](clusters/aauti-jitsi-nonprod-gke/README.md) | `aauti-jitsi-noprod` | asia-south1-a | Spoke (tenant `jitsi`): Alloy agent + kube-state-metrics in `observability-agent-jitsinonprod`. **Deployed**, Grafana folder *Jitsi-nonprod*. The README also defines the standard for onboarding the other clusters. |
+| [aauti-jitsi-nonprod-gke](clusters/aauti-jitsi-nonprod-gke/README.md) | `aauti-jitsi-noprod` | asia-south1-a | Spoke (tenant `jitsi`): Alloy agent + kube-state-metrics in `observability-agent-jitsinonprod`. **Deployed** 2026-09-30, Grafana folder *Jitsi-nonprod*. The README also defines the standard for onboarding the other clusters. |
 | [aauti-media-nonprod-as1-gke](clusters/aauti-media-nonprod-as1-gke/README.md) | `aauti-media-nonprod` | asia-south1-a | Spoke (tenant `media`): Alloy agent + kube-state-metrics in `observability-agent-medianonprod`. **Deployed** 2026-10-01, Grafana folder *Media-nonprod*. |
-
 | [aauti-platform-nonprod-as1-gke](clusters/aauti-platform-nonprod-as1-gke/README.md) | `aauti-platform-noprod` | asia-south1-a | Spoke (tenant `platform-app`): Alloy agent + kube-state-metrics in `observability-agent-platformnonprod`. **Deployed** 2026-10-01, Grafana folder *Platform-nonprod*. |
 
 Not onboarded: `aauti-media-nonprod-gke` and `aauti-nonprod-gke` (both us-central1-a, in the same projects as the as1 clusters).
 
 `network/` holds the VPC peering / internal IP scripts, one per spoke VPC. They are idempotent and support `-WhatIf`
-(media-nonprod's peering already existed, so its script only checks it).
+(media-nonprod's and platform-nonprod's peerings already existed, so their scripts only check them).
 
 ## Charts
 

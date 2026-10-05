@@ -4,6 +4,15 @@ A Helm chart that deploys a centralized, multi-tenant Grafana observability
 stack on the **hub** cluster and a lightweight collection agent on every
 **spoke** cluster (Media, Application, Jitsi, …).
 
+> **In this repo.** This is a copy of the POC chart (`D:\k6s\observability-stack`), and these docs
+> still describe the POC. Differences here:
+> - `scripts/` and `environments/` exist only in the POC. Deploy with the per-cluster scripts in
+>   `clusters/<cluster>/` instead (see the root `README.md`).
+> - On the hub, the chart's `grafana`, `grafanaAccess` and `alerting` are disabled. Grafana runs
+>   standalone (`clusters/aauti-hub-as1-obs-gke/grafana/`), so there are no tenant teams/orgs, no
+>   *Tenant usage* dashboard and no usage alerts yet.
+> - Tenants are `platform` (hub), `jitsi`, `media` and `platform-app`. Storage is in-cluster MinIO (no GCS yet).
+
 ```
  spoke: media ──┐        HTTPS + basic auth (tenant = user)        ┌──────────── hub ────────────┐
   Alloy agent   │                                                  │  observability-gateway     │

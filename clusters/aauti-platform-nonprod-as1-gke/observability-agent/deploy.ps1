@@ -30,7 +30,7 @@ if ($peer -notmatch "platform-nonprod-to-hub") { throw "VPC peering platform-non
 $lbIp = kubectl --context $HubContext -n observability get svc observability-gateway-internal -o jsonpath="{.status.loadBalancer.ingress[0].ip}"
 if ($lbIp -ne $GatewayIp) { throw "hub internal LB not ready (got '$lbIp', want $GatewayIp) - deploy hub observability first" }
 $ranges = kubectl --context $HubContext -n observability get svc observability-gateway-internal -o jsonpath="{.spec.loadBalancerSourceRanges}"
-if ($ranges -notmatch "10\.33\.0\.0/17") { throw "hub internal LB does not allow this cluster's pod range - deploy hub observability first" }
+if ($ranges -notmatch "10\.5\.0\.0/17") { throw "hub internal LB does not allow this cluster's pod range - deploy hub observability first" }
 
 # --- credentials from the hub (never written to the repo) -------------------
 $pwB64 = kubectl --context $HubContext -n observability get secret observability-tenant-credentials -o jsonpath="{.data.$Tenant}"

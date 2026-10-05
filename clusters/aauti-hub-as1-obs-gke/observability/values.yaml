@@ -4,9 +4,10 @@
 #
 # - Object storage: in-cluster MinIO (no GCS buckets yet).
 # - Grafana is NOT part of this release; it runs standalone in namespace
-#   "grafana" (../grafana). No datasources are linked yet.
-# - Loki + Mimir are reachable only through the authenticating gateway
-#   (ClusterIP, not exposed outside the cluster yet).
+#   "grafana" (../grafana), with a Loki + Mimir datasource pair per tenant.
+# - Loki + Mimir are reachable only through the authenticating gateway:
+#   ClusterIP for Grafana in-cluster, plus the internal LB 10.40.16.10 for
+#   spokes over VPC peering (gateway-internal-lb.yaml). Nothing is public.
 
 cluster:
   name: aauti-hub-as1-obs-gke
@@ -21,7 +22,8 @@ agent:
 tenants:
   jitsi:
     title: Jitsi
-    # Spokes: aauti-jitsi-nonprod-gke (environment nonprod). Sized from its
+    # Spokes: aauti-jitsi-nonprod-gke (environment shared; log lines naming a
+    # meeting room get that room's dev / qa / demo / sandbox). Sized from its
     # Prometheus (~90k series incl. control plane, ~3.4k samples/s); the agent
     # sends a filtered subset, so these leave >3x headroom.
     dashboards: [cluster-health, resource-usage, workloads-logs]

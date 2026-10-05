@@ -1,5 +1,12 @@
 # Authentication, TLS and Grafana access
 
+> **In this repo** section 1 applies as written. Sections 2–3 describe the chart's bundled Grafana,
+> which is disabled on the hub. The standalone Grafana (`clusters/aauti-hub-as1-obs-gke/grafana/`)
+> reads tenant passwords and the CA from Secret `grafana-hub-datasource`, mounted at
+> `/etc/grafana/hub/<tenant>` and `/etc/grafana/hub/ca.crt`; its admin login is Secret
+> `grafana-admin` in namespace `grafana`. `grafanaAccess` is off, so there are no tenant
+> teams/orgs: any Editor can query every tenant's datasource.
+
 ## 1. Spoke → hub: TLS + per-tenant basic auth
 
 Every write and read against Loki and Mimir goes through
