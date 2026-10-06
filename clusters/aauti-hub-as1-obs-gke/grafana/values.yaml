@@ -1,6 +1,7 @@
 # Standalone Grafana for aauti-hub-as1-obs-gke, served at https://grafana.aauti.ai
-# Chart: grafana/grafana 10.5.15. Datasources: Loki + Mimir per tenant
-# (platform, jitsi, media, media-prod, platform-app). Dashboards: folder per
+# Chart: grafana/grafana 10.5.15. Datasources: "Loki" + "Mimir" across all
+# tenants (Mimir is the default); no per-tenant datasources
+# (aauti-hub, jitsi-nonprod, media-nonprod, media-prod, platform-nonprod). Dashboards: folder per
 # tenant (Jitsi-nonprod, Media-nonprod, Media-prod, Platform-nonprod).
 #
 # Exposure: GKE Ingress (external HTTPS LB) + Google-managed certificate on the
@@ -65,7 +66,7 @@ envValueFrom:
   GF_SMTP_PASSWORD:
     secretKeyRef: { name: grafana-smtp, key: password, optional: true }
 
-# Loki + Mimir of tenant "platform", through the observability gateway (HTTPS,
+# Loki + Mimir of tenant "aauti-hub" (hub self-monitoring), through the observability gateway (HTTPS,
 # private CA, basic auth). Password and CA come from Secret
 # grafana-hub-datasource, copied from namespace "observability" by deploy.ps1.
 extraSecretMounts:
@@ -77,179 +78,63 @@ extraSecretMounts:
 datasources:
   datasources.yaml:
     apiVersion: 1
+    # Removed datasources: the per-tenant pairs (2026-10-06; everything uses the
+    # federated "Loki" / "Mimir" now) and the names before the tenant renames.
+    deleteDatasources:
+      - { name: Loki – Platform, orgId: 1 }
+      - { name: Mimir – Platform, orgId: 1 }
+      - { name: Loki – Jitsi, orgId: 1 }
+      - { name: Mimir – Jitsi, orgId: 1 }
+      - { name: Loki – Media, orgId: 1 }
+      - { name: Mimir – Media, orgId: 1 }
+      - { name: Loki – Platform-app, orgId: 1 }
+      - { name: Mimir – Platform-app, orgId: 1 }
+      - { name: Loki – Aauti-hub, orgId: 1 }
+      - { name: Mimir – Aauti-hub, orgId: 1 }
+      - { name: Loki – Jitsi-nonprod, orgId: 1 }
+      - { name: Mimir – Jitsi-nonprod, orgId: 1 }
+      - { name: Loki – Media-nonprod, orgId: 1 }
+      - { name: Mimir – Media-nonprod, orgId: 1 }
+      - { name: Loki – Media-prod, orgId: 1 }
+      - { name: Mimir – Media-prod, orgId: 1 }
+      - { name: Loki – Platform-nonprod, orgId: 1 }
+      - { name: Mimir – Platform-nonprod, orgId: 1 }
     datasources:
-      - name: Loki – Platform
-        uid: loki-platform
+      # One datasource per signal across ALL tenants (Loki / Mimir tenant
+      # federation). User grafana-reader is read-only; the gateway pins its
+      # X-Scope-OrgID to every tenant, so no header is sent here. Filter with
+      # the labels product / env / cluster / namespace / app / pod / container
+      # (__tenant_id__ is added by Loki / Mimir).
+      - name: Loki
+        uid: loki
         type: loki
         access: proxy
         url: https://observability-gateway.observability.svc:443
         basicAuth: true
-        basicAuthUser: platform
+        basicAuthUser: grafana-reader
         editable: false
         jsonData:
           tlsAuthWithCACert: true
-          httpHeaderName1: X-Scope-OrgID
           maxLines: 1000
         secureJsonData:
-          basicAuthPassword: $__file{/etc/grafana/hub/platform}
+          basicAuthPassword: $__file{/etc/grafana/hub/grafana-reader}
           tlsCACert: $__file{/etc/grafana/hub/ca.crt}
-          httpHeaderValue1: platform
-      - name: Mimir – Platform
-        uid: mimir-platform
+      - name: Mimir
+        uid: mimir
         type: prometheus
         access: proxy
         url: https://observability-gateway.observability.svc:443/prometheus
         basicAuth: true
-        basicAuthUser: platform
+        basicAuthUser: grafana-reader
         isDefault: true
         editable: false
         jsonData:
           tlsAuthWithCACert: true
-          httpHeaderName1: X-Scope-OrgID
           prometheusType: Mimir
           timeInterval: 60s
         secureJsonData:
-          basicAuthPassword: $__file{/etc/grafana/hub/platform}
+          basicAuthPassword: $__file{/etc/grafana/hub/grafana-reader}
           tlsCACert: $__file{/etc/grafana/hub/ca.crt}
-          httpHeaderValue1: platform
-      # Tenant "jitsi" (spokes: aauti-jitsi-nonprod-gke). Same gateway, own
-      # credentials, so these datasources can only read Jitsi data.
-      - name: Loki – Jitsi
-        uid: loki-jitsi
-        type: loki
-        access: proxy
-        url: https://observability-gateway.observability.svc:443
-        basicAuth: true
-        basicAuthUser: jitsi
-        editable: false
-        jsonData:
-          tlsAuthWithCACert: true
-          httpHeaderName1: X-Scope-OrgID
-          maxLines: 1000
-        secureJsonData:
-          basicAuthPassword: $__file{/etc/grafana/hub/jitsi}
-          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
-          httpHeaderValue1: jitsi
-      - name: Mimir – Jitsi
-        uid: mimir-jitsi
-        type: prometheus
-        access: proxy
-        url: https://observability-gateway.observability.svc:443/prometheus
-        basicAuth: true
-        basicAuthUser: jitsi
-        editable: false
-        jsonData:
-          tlsAuthWithCACert: true
-          httpHeaderName1: X-Scope-OrgID
-          prometheusType: Mimir
-          timeInterval: 60s
-        secureJsonData:
-          basicAuthPassword: $__file{/etc/grafana/hub/jitsi}
-          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
-          httpHeaderValue1: jitsi
-      # Tenant "media" (spokes: aauti-media-nonprod-as1-gke). Same gateway, own
-      # credentials, so these datasources can only read Media data.
-      - name: Loki – Media
-        uid: loki-media
-        type: loki
-        access: proxy
-        url: https://observability-gateway.observability.svc:443
-        basicAuth: true
-        basicAuthUser: media
-        editable: false
-        jsonData:
-          tlsAuthWithCACert: true
-          httpHeaderName1: X-Scope-OrgID
-          maxLines: 1000
-        secureJsonData:
-          basicAuthPassword: $__file{/etc/grafana/hub/media}
-          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
-          httpHeaderValue1: media
-      - name: Mimir – Media
-        uid: mimir-media
-        type: prometheus
-        access: proxy
-        url: https://observability-gateway.observability.svc:443/prometheus
-        basicAuth: true
-        basicAuthUser: media
-        editable: false
-        jsonData:
-          tlsAuthWithCACert: true
-          httpHeaderName1: X-Scope-OrgID
-          prometheusType: Mimir
-          timeInterval: 60s
-        secureJsonData:
-          basicAuthPassword: $__file{/etc/grafana/hub/media}
-          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
-          httpHeaderValue1: media
-      # Tenant "media-prod" (spokes: aauti-media-prod-as1-gke; 30d retention).
-      - name: Loki – Media-prod
-        uid: loki-media-prod
-        type: loki
-        access: proxy
-        url: https://observability-gateway.observability.svc:443
-        basicAuth: true
-        basicAuthUser: media-prod
-        editable: false
-        jsonData:
-          tlsAuthWithCACert: true
-          httpHeaderName1: X-Scope-OrgID
-          maxLines: 1000
-        secureJsonData:
-          basicAuthPassword: $__file{/etc/grafana/hub/media-prod}
-          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
-          httpHeaderValue1: media-prod
-      - name: Mimir – Media-prod
-        uid: mimir-media-prod
-        type: prometheus
-        access: proxy
-        url: https://observability-gateway.observability.svc:443/prometheus
-        basicAuth: true
-        basicAuthUser: media-prod
-        editable: false
-        jsonData:
-          tlsAuthWithCACert: true
-          httpHeaderName1: X-Scope-OrgID
-          prometheusType: Mimir
-          timeInterval: 60s
-        secureJsonData:
-          basicAuthPassword: $__file{/etc/grafana/hub/media-prod}
-          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
-          httpHeaderValue1: media-prod
-      # Tenant "platform-app" (spokes: aauti-platform-nonprod-as1-gke).
-      - name: Loki – Platform-app
-        uid: loki-platform-app
-        type: loki
-        access: proxy
-        url: https://observability-gateway.observability.svc:443
-        basicAuth: true
-        basicAuthUser: platform-app
-        editable: false
-        jsonData:
-          tlsAuthWithCACert: true
-          httpHeaderName1: X-Scope-OrgID
-          maxLines: 1000
-        secureJsonData:
-          basicAuthPassword: $__file{/etc/grafana/hub/platform-app}
-          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
-          httpHeaderValue1: platform-app
-      - name: Mimir – Platform-app
-        uid: mimir-platform-app
-        type: prometheus
-        access: proxy
-        url: https://observability-gateway.observability.svc:443/prometheus
-        basicAuth: true
-        basicAuthUser: platform-app
-        editable: false
-        jsonData:
-          tlsAuthWithCACert: true
-          httpHeaderName1: X-Scope-OrgID
-          prometheusType: Mimir
-          timeInterval: 60s
-        secureJsonData:
-          basicAuthPassword: $__file{/etc/grafana/hub/platform-app}
-          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
-          httpHeaderValue1: platform-app
 
 # Dashboards as code: one provider + folder per tenant. deploy.ps1 renders the
 # ConfigMap grafana-dashboards-<tenant> from charts/observability-stack/dashboards
@@ -258,7 +143,7 @@ dashboardProviders:
   dashboardproviders.yaml:
     apiVersion: 1
     providers:
-      - name: jitsi
+      - name: jitsi-nonprod
         orgId: 1
         folder: Jitsi-nonprod
         type: file
@@ -266,8 +151,8 @@ dashboardProviders:
         editable: false
         allowUiUpdates: false
         options:
-          path: /var/lib/grafana/dashboards/jitsi
-      - name: media
+          path: /var/lib/grafana/dashboards/jitsi-nonprod
+      - name: media-nonprod
         orgId: 1
         folder: Media-nonprod
         type: file
@@ -275,7 +160,7 @@ dashboardProviders:
         editable: false
         allowUiUpdates: false
         options:
-          path: /var/lib/grafana/dashboards/media
+          path: /var/lib/grafana/dashboards/media-nonprod
       - name: media-prod
         orgId: 1
         folder: Media-prod
@@ -285,7 +170,7 @@ dashboardProviders:
         allowUiUpdates: false
         options:
           path: /var/lib/grafana/dashboards/media-prod
-      - name: platform-app
+      - name: platform-nonprod
         orgId: 1
         folder: Platform-nonprod
         type: file
@@ -293,12 +178,12 @@ dashboardProviders:
         editable: false
         allowUiUpdates: false
         options:
-          path: /var/lib/grafana/dashboards/platform-app
+          path: /var/lib/grafana/dashboards/platform-nonprod
 dashboardsConfigMaps:
-  jitsi: grafana-dashboards-jitsi
-  media: grafana-dashboards-media
+  jitsi-nonprod: grafana-dashboards-jitsi-nonprod
+  media-nonprod: grafana-dashboards-media-nonprod
   media-prod: grafana-dashboards-media-prod
-  platform-app: grafana-dashboards-platform-app
+  platform-nonprod: grafana-dashboards-platform-nonprod
 
 # Alerting as code: rule files from alerting/*.yaml (ConfigMap
 # grafana-alerting-rules) plus the email contact point + notification policy

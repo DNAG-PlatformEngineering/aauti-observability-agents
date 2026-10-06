@@ -67,7 +67,8 @@ https://{{ include "obs.gatewayName" . }}.{{ .Release.Namespace }}.svc:{{ .Value
 {{- end -}}
 {{- end }}
 
-{{/* Returns a dict tenant-id -> password (as JSON). */}}
+{{/* Returns a dict tenant-id -> password (as JSON). With gateway.reader
+     enabled it also holds the read-only federated user (gateway.reader.username). */}}
 {{- define "obs.tenantPasswords" -}}
 {{- include "obs.cache" . -}}
 {{- if not (hasKey .Values._cache "tenantPasswords") -}}
@@ -84,6 +85,11 @@ https://{{ include "obs.gatewayName" . }}.{{ .Release.Namespace }}.svc:{{ .Value
 {{- $pw = randAlphaNum 32 -}}
 {{- end -}}
 {{- $_ := set $out $id $pw -}}
+{{- end -}}
+{{- if .Values.gateway.reader.enabled -}}
+{{- $rid := .Values.gateway.reader.username -}}
+{{- $rpw := ternary (index $existingData $rid | default "" | b64dec) (randAlphaNum 32) (hasKey $existingData $rid) -}}
+{{- $_ := set $out $rid $rpw -}}
 {{- end -}}
 {{- $_ := set .Values._cache "tenantPasswords" $out -}}
 {{- end -}}

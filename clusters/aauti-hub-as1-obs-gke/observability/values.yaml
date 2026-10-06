@@ -12,18 +12,22 @@
 cluster:
   name: aauti-hub-as1-obs-gke
   environment: prod
+  product: aauti-hub          # `product` label (single Loki / Mimir datasource in Grafana)
 
 agent:
-  tenant: platform          # hub self-monitoring
+  tenant: aauti-hub         # hub self-monitoring
   namespaces: []            # whole hub cluster
+  envLabel: { enabled: true }   # `env` = `environment`
 
-# One tenant per product, plus <product>-prod for its prod clusters (prod is
-# kept 30d; Mimir has one metrics retention per tenant). Clusters within a
+# One tenant per product and tier: <product>-nonprod and <product>-prod (prod
+# is kept 30d, nonprod 7d / 10d; Mimir has one metrics retention per tenant).
+# jitsi-nonprod / media-nonprod / platform-nonprod were jitsi / media /
+# platform-app until 2026-10-06. Clusters within a
 # tenant are told apart by the cluster / environment labels the agents attach
 # (see ../../aauti-jitsi-nonprod-gke).
 tenants:
-  jitsi:
-    title: Jitsi
+  jitsi-nonprod:
+    title: Jitsi-nonprod
     # Spokes: aauti-jitsi-nonprod-gke (environment shared; log lines naming a
     # meeting room get that room's dev / qa / demo / sandbox). Sized from its
     # Prometheus (~90k series incl. control plane, ~3.4k samples/s); the agent
@@ -36,10 +40,10 @@ tenants:
     metrics:
       retention: 168h        # 7d
       limits: { ingestion_rate: 30000, ingestion_burst_size: 300000, max_global_series_per_user: 150000 }
-  media:
-    title: Media
+  media-nonprod:
+    title: Media-nonprod
     # Spokes: aauti-media-nonprod-as1-gke (dev, qa, demo, sandbox; ~34 app
-    # pods). Same limits as jitsi until there is real volume to size from.
+    # pods). Same limits as jitsi-nonprod until there is real volume to size from.
     dashboards: [cluster-health, resource-usage, workloads-logs]
     # Retention policy: dev + sandbox 7 days, qa + demo 10 days.
     # Logs: per environment (Loki retention_stream); everything else, incl.
@@ -57,8 +61,8 @@ tenants:
   media-prod:
     title: Media-prod
     # Spokes: aauti-media-prod-as1-gke (environment prod). Own tenant, not
-    # "media", because Mimir has one metrics retention per tenant and prod
-    # needs 30d while media nonprod keeps 7d / 10d. Same limits as media until
+    # "media-nonprod", because Mimir has one metrics retention per tenant and prod
+    # needs 30d while media nonprod keeps 7d / 10d. Same limits as media-nonprod until
     # there is real volume to size from.
     dashboards: [cluster-health, resource-usage, workloads-logs]
     # Retention policy: prod 30 days, logs and metrics.
@@ -68,12 +72,12 @@ tenants:
     metrics:
       retention: 720h        # 30d
       limits: { ingestion_rate: 30000, ingestion_burst_size: 300000, max_global_series_per_user: 150000 }
-  platform-app:
-    title: Platform-app
+  platform-nonprod:
+    title: Platform-nonprod
     # Spokes: aauti-platform-nonprod-as1-gke (11 apps x dev, qa, demo, sandbox;
-    # ~65 app pods). "platform" is taken by the hub's self-monitoring.
+    # ~65 app pods).
     dashboards: [cluster-health, resource-usage, workloads-logs]
-    # Retention policy: dev + sandbox 7 days, qa + demo 10 days (same as media).
+    # Retention policy: dev + sandbox 7 days, qa + demo 10 days (same as media-nonprod).
     # Logs per environment; "shared" (kube-system, platform-gateway) 7d.
     # Metrics: one retention per tenant in Mimir, so 10d for all.
     logs:
@@ -84,8 +88,10 @@ tenants:
     metrics:
       retention: 240h        # 10d
       limits: { ingestion_rate: 50000, ingestion_burst_size: 500000, max_global_series_per_user: 300000 }
-  platform:
-    title: Platform
+  # Hub self-monitoring (this cluster's Alloy). Was "platform" until
+  # 2026-10-06; renamed so it isn't confused with the platform app clusters.
+  aauti-hub:
+    title: Aauti-hub
     dashboards: [cluster-health, resource-usage, workloads-logs, tenant-usage]
     logs:
       retention: 336h        # 14d
@@ -93,15 +99,21 @@ tenants:
     metrics:
       retention: 720h        # 30d
       limits: { ingestion_rate: 50000, ingestion_burst_size: 500000, max_global_series_per_user: 300000 }
+  # The chart's default tenant; removed (renamed to aauti-hub above). Its old
+  # data stays in MinIO, unreadable, until the default retention deletes it.
+  platform: null
 
 # Grafana is managed separately (../grafana).
 grafana: { enabled: false }
 grafanaAccess: { enabled: false }
 alerting: { enabled: false }
-k6: { enabled: true, tenant: platform }   # no tests defined yet; tenant is temporary
+k6: { enabled: true, tenant: aauti-hub }   # no tests defined yet; tenant is temporary
 
 gateway:
   service: { type: ClusterIP }
+  # Read-only user "grafana-reader" for Grafana's single "Loki" / "Mimir"
+  # datasources: the gateway pins it to all tenants (federation), no push.
+  reader: { enabled: true }
 
 # Every pod must run on the dedicated node pool (tainted workload=observability).
 scheduling: &sched
@@ -117,6 +129,9 @@ minio:
     requests: { cpu: 100m, memory: 512Mi }
 
 loki:
+  loki:
+    structuredConfig:
+      querier: { multi_tenant_queries_enabled: true }   # for gateway.reader
   singleBinary:
     <<: *sched
     persistence: { size: 20Gi, storageClass: standard-rwo }
@@ -125,6 +140,9 @@ loki:
       limits: { memory: 2Gi }
 
 mimir:
+  mimir:
+    structuredConfig:
+      tenant_federation: { enabled: true }              # for gateway.reader
   distributor: *sched
   ingester:
     <<: *sched

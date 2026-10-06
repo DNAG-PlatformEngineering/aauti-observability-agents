@@ -1,7 +1,7 @@
 # Observability agent on aauti-platform-nonprod-as1-gke (namespace
 # "observability-agent-platformnonprod"). Chart: ../../../charts/observability-stack
 # (spoke mode), layered on its profiles/spoke.yaml. Ships to the hub
-# aauti-hub-as1-obs-gke, tenant "platform-app".
+# aauti-hub-as1-obs-gke, tenant "platform-nonprod".
 #
 # - Scope: every namespace of the cluster (logs + metrics + Kubernetes events).
 # - Labels on every series / log stream: cluster, environment, namespace, pod,
@@ -11,25 +11,27 @@
 #   peering platform-nonprod-to-hub / hub-to-platform-nonprod.
 # - Security: TLS 1.2+ verified against the hub's private CA (Secret
 #   observability-agent-platformnonprod-hub-ca) with SNI observability-gateway.observability.svc,
-#   plus basic auth as tenant "platform-app" (Secret observability-agent-platformnonprod-auth).
+#   plus basic auth as tenant "platform-nonprod" (Secret observability-agent-platformnonprod-auth).
 #   Neither secret is stored in this repo; deploy.ps1 copies them from the hub.
 #
-# Tenant "platform-app" is shared by all Platform app clusters; they are told apart by the
+# Tenant "platform-nonprod" is shared by all Platform app nonprod clusters; they are told apart by the
 # cluster / environment labels.
 
 cluster:
   name: aauti-platform-nonprod-as1-gke
   tier: nonprod
+  product: platform            # `product` label (single Loki / Mimir datasource in Grafana)
   # One cluster for dev, qa, demo and sandbox (aauti-<app>-<env>
   # namespaces get that environment from the suffix). Shared namespaces
   # (platform-gateway, kube-system) and nodes are "shared".
   environment: shared
 
 agent:
-  tenant: platform-app
+  tenant: platform-nonprod
   # Standard for every cluster: environment from the namespace suffix
   # (-dev / -qa / -demo / -sandbox / -uat / -staging), else cluster.environment.
   environmentFromNamespace: { enabled: true }
+  envLabel: { enabled: true }   # also send `environment` as `env`
   hubUrl: https://10.40.16.10
   # Every name carries the cluster name, like the release and namespace. The
   # alloy sub-chart can't template these, so they are repeated under alloy below.

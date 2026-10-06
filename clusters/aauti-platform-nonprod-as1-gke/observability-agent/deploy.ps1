@@ -1,11 +1,11 @@
 # Installs the observability agent (Alloy + kube-state-metrics) on
 # aauti-platform-nonprod-as1-gke, namespace "observability-agent-platformnonprod",
-# shipping logs and metrics to the hub (tenant "platform-app") over the private VPC
+# shipping logs and metrics to the hub (tenant "platform-nonprod") over the private VPC
 # peering.
 #
 # Prerequisites, in order (see ../README.md):
 #   1. VPC peering platform-nonprod-to-hub / hub-to-platform-nonprod (already ACTIVE)
-#   2. ../../aauti-hub-as1-obs-gke/observability/deploy.ps1  (tenant platform-app + internal LB)
+#   2. ../../aauti-hub-as1-obs-gke/observability/deploy.ps1  (tenant platform-nonprod + internal LB)
 #   3. ../../aauti-hub-as1-obs-gke/grafana/deploy.ps1        (datasources + dashboards)
 #
 # Only creates new objects in the new namespace observability-agent-platformnonprod
@@ -17,7 +17,7 @@ param(
   [string] $SpokeContext = "gke_aauti-platform-noprod_asia-south1-a_aauti-platform-nonprod-as1-gke",
   [string] $Namespace = "observability-agent-platformnonprod",
   [string] $Release = "observability-agent-platformnonprod",
-  [string] $Tenant = "platform-app",
+  [string] $Tenant = "platform-nonprod",
   [string] $GatewayIp = "10.40.16.10"
 )
 $ErrorActionPreference = "Stop"

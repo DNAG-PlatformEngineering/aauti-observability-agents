@@ -8,8 +8,8 @@ clusters are onboarded the same way (see [Standard](#standard-for-the-next-clust
 | GCP project | `aauti-jitsi-noprod` |
 | Location | asia-south1-a (zonal) |
 | VPC | `aauti-jitsi-nonprod-vpc`: nodes 10.16.0.0/24, pods 10.17.0.0/17, services 10.18.0.0/22 |
-| Hub | `aauti-hub-as1-obs-gke`, tenant **`jitsi`**, Grafana https://grafana.aauti.ai (folder **Jitsi-nonprod**) |
-| Labels on all data | `cluster=aauti-jitsi-nonprod-gke`, `tier=nonprod`, `environment`, `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). **environment:** one Jitsi (`devvideo.aauti.com`) serves **dev, qa, demo and sandbox**, chosen per meeting by the room name (`<title>-<id>-aauti-<env>`, recordings `…-recording-<env>`). Infrastructure (pods, nodes, JVB load, all metrics) = `shared`. Log lines naming a room (web, prosody, jicofo, jvb, jibri `[finalize][<env>]`) = that meeting's env. |
+| Hub | `aauti-hub-as1-obs-gke`, tenant **`jitsi-nonprod`** (was `jitsi` until 2026-10-06), Grafana https://grafana.aauti.ai (folder **Jitsi-nonprod**) |
+| Labels on all data | `cluster=aauti-jitsi-nonprod-gke`, `tier=nonprod`, `product=jitsi`, `environment`, `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). **environment:** one Jitsi (`devvideo.aauti.com`) serves **dev, qa, demo and sandbox**, chosen per meeting by the room name (`<title>-<id>-aauti-<env>`, recordings `…-recording-<env>`). Infrastructure (pods, nodes, JVB load, all metrics) = `shared`. Log lines naming a room (web, prosody, jicofo, jvb, jibri `[finalize][<env>]`) = that meeting's env.. `env` = same value as `environment` (since 2026-10-06) |
 | Status | **Deployed** 2026-09-30. Grafana folder **Jitsi-nonprod**. |
 | Agent namespace / Helm release | `observability-agent-jitsinonprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. Renamed from `observability-agent` on 2026-10-01. |
 
@@ -21,13 +21,13 @@ aauti-jitsi-nonprod-gke                                      aauti-hub-as1-obs-g
  ┌───────────────────────────────┐   VPC peering (private)   ┌──────────────────────────────────┐
  │ Alloy (StatefulSet, 1 replica,│   HTTPS 443, TLS 1.2/1.3  │ observability-gateway-internal   │
  │  monitoring node pool)        │──────────────────────────▶│  internal LB 10.40.16.10         │
- │  • pod logs, all namespaces   │   basic auth user "jitsi" │  (ingest subnet, source-ranged)  │
+ │  • pod logs, all namespaces   │   user "jitsi-nonprod"    │  (ingest subnet, source-ranged)  │
  │  • k8s events                 │   CA-pinned, SNI          │        │                         │
  │  • kubelet / cAdvisor         │   observability-gateway.  │  NGINX gateway ── Loki  (logs)   │
  │  • kube-state-metrics (own)   │   observability.svc       │   X-Scope-OrgID ─ Mimir (metrics)│
  │  • node-exporter (existing)   │                           │                                  │
  │  • JVB (pod annotations)      │                           │ ns grafana: Grafana              │
- │  • Prosody, Jicofo (existing  │                           │  "Loki – Jitsi" / "Mimir – Jitsi"│
+ │  • Prosody, Jicofo (existing  │                           │  "Loki" / "Mimir" (all tenants)  │
  │    ServiceMonitor/PodMonitor) │                           │  folder Jitsi-nonprod: 4 dashbds │
  └───────────────────────────────┘                           └──────────────────────────────────┘
 ```
@@ -43,21 +43,21 @@ Jitsi release are **not modified**. The agent only *reads*:
 |---|---|
 | Private only | The agent's only destination is `https://10.40.16.10` (RFC 1918). That IP belongs to an **internal** passthrough LB in the hub VPC, reachable only over the peering `jitsi-nonprod-to-hub` ⇄ `hub-to-jitsi-nonprod`. There's no public IP, public DNS or internet path. The LB's firewall rule (created by GKE) only allows `10.16.0.0/24` and `10.17.0.0/17`. |
 | TLS | Gateway listens only on TLS (8443 → LB 443, TLSv1.2/1.3). The agent verifies the certificate against the hub's private CA (`ca_file`) with `server_name = observability-gateway.observability.svc`. `insecure_skip_verify` is off. |
-| Authentication | Basic auth per tenant (`jitsi`, bcrypt htpasswd on the gateway). The gateway derives `X-Scope-OrgID` from the user and returns 403 on a mismatch, so this cluster can only write or read tenant `jitsi`. The password lives only in Secrets: hub `observability-tenant-credentials`, spoke `observability-agent-jitsinonprod-auth`. |
-| Least privilege | Agent RBAC is read-only (get/list/watch; pods/log; nodes/metrics). Grafana's Jitsi datasources authenticate as `jitsi` and can't read `platform`. |
+| Authentication | Basic auth per tenant (`jitsi-nonprod`, bcrypt htpasswd on the gateway). The gateway derives `X-Scope-OrgID` from the user and returns 403 on a mismatch, so this cluster can only write or read tenant `jitsi-nonprod`. The password lives only in Secrets: hub `observability-tenant-credentials`, spoke `observability-agent-jitsinonprod-auth`. |
+| Least privilege | Agent RBAC is read-only (get/list/watch; pods/log; nodes/metrics). Grafana's Jitsi datasources authenticate as `jitsi-nonprod` and can't read any other tenant. |
 
 ## Files
 
 | File | Applies to | What |
 |---|---|---|
 | [`../../network/aauti-jitsi-nonprod.ps1`](../../network/aauti-jitsi-nonprod.ps1) | both VPCs | reserves 10.40.16.10, creates both peerings (idempotent, supports `-WhatIf`) |
-| [`../aauti-hub-as1-obs-gke/observability/values.yaml`](../aauti-hub-as1-obs-gke/observability/values.yaml) | hub | adds tenant `jitsi` (limits; retention 7d logs + metrics, all environments) |
+| [`../aauti-hub-as1-obs-gke/observability/values.yaml`](../aauti-hub-as1-obs-gke/observability/values.yaml) | hub | adds tenant `jitsi-nonprod` (limits; retention 7d logs + metrics, all environments) |
 | [`../aauti-hub-as1-obs-gke/observability/gateway-internal-lb.yaml`](../aauti-hub-as1-obs-gke/observability/gateway-internal-lb.yaml) | hub | new internal LB Service (existing ClusterIP Service untouched) |
 | [`../aauti-hub-as1-obs-gke/grafana/values.yaml`](../aauti-hub-as1-obs-gke/grafana/values.yaml) + `deploy.ps1` | hub | Jitsi datasources and dashboard folder |
 | [`observability-agent/values.yaml`](observability-agent/values.yaml) | this cluster | agent Helm values |
 | [`observability-agent/deploy.ps1`](observability-agent/deploy.ps1) | this cluster | copies credentials and CA from the hub, runs `helm upgrade --install` |
 | [`observability-agent/verify.ps1`](observability-agent/verify.ps1) | both (read-only) | checks the private path, TLS, auth, and data in Grafana |
-| `charts/observability-stack` | — | two opt-in chart options: `agent.tls.serverName` and `agent.metrics.prometheusOperator` (both off by default, so the hub render is unchanged). The dashboards get an `environment` variable, and there's a new *Jitsi Meet* dashboard (`dashboards/tenants/jitsi/`). |
+| `charts/observability-stack` | — | two opt-in chart options: `agent.tls.serverName` and `agent.metrics.prometheusOperator` (both off by default, so the hub render is unchanged). The dashboards get an `environment` variable, and there's a new *Jitsi Meet* dashboard (`dashboards/tenants/jitsi-nonprod/`). |
 
 ## Rollout (run from the office network / VPN, in this order)
 
@@ -68,7 +68,7 @@ cd D:\aauti-observability-agents
 ./network/aauti-jitsi-nonprod.ps1 -WhatIf
 ./network/aauti-jitsi-nonprod.ps1
 
-# 2. Hub: tenant "jitsi" + internal LB. The gateway pod restarts once (config change).
+# 2. Hub: tenant "jitsi-nonprod" + internal LB. The gateway pod restarts once (config change).
 ./clusters/aauti-hub-as1-obs-gke/observability/deploy.ps1
 
 # 3. Hub Grafana: Jitsi datasources + dashboards (Grafana pod restarts once).
@@ -89,7 +89,7 @@ kubectl --context gke_aauti-hub_asia-south1-a_aauti-hub-as1-obs-gke -n observabi
 gcloud compute networks peerings delete jitsi-nonprod-to-hub --network aauti-jitsi-nonprod-vpc --project aauti-jitsi-noprod
 gcloud compute networks peerings delete hub-to-jitsi-nonprod --network aauti-hub-vpc --project aauti-hub
 ```
-Then remove `jitsi` from the hub values and redeploy observability and Grafana.
+Then remove `jitsi-nonprod` from the hub values and redeploy observability and Grafana.
 
 ## Dashboards (Grafana → folder **Jitsi-nonprod**)
 
@@ -106,18 +106,19 @@ by all environments of a cluster.
   - Prosody: sessions, token auth
   - `jitsi` namespace logs
 
-Raw queries: *Explore* → `Loki – Jitsi` (e.g. `{cluster="aauti-jitsi-nonprod-gke", namespace="jitsi"}`)
-or `Mimir – Jitsi` (e.g. `jitsi_participants{tier="nonprod"}`).
+Raw queries: *Explore* → `Loki` / `Mimir` (all tenants), e.g. Loki `{product="jitsi", cluster="aauti-jitsi-nonprod-gke"}` or `{cluster="aauti-jitsi-nonprod-gke", namespace="jitsi"}`
+or Mimir `jitsi_participants{tier="nonprod"}`.
 
 ## Standard for the next clusters
 
 For each new cluster:
 
-0. **Labels.** Every cluster sets `cluster.name`, `cluster.tier` (`prod` / `nonprod`) and
-   `cluster.environment`, and enables `agent.environmentFromNamespace`.
+0. **Labels.** Every cluster sets `cluster.name`, `cluster.tier` (`prod` / `nonprod`), `cluster.product`
+   (`media`, `jitsi`, `platform`, …; the `product` filter of the single `Loki` / `Mimir` datasources) and
+   `cluster.environment`, and enables `agent.environmentFromNamespace` and `agent.envLabel` (`env` = `environment`).
    - Namespaces ending in `-dev`, `-qa`, `-demo`, `-sandbox`, `-uat` or `-staging` get that environment. For example, `aauti-api-qa` becomes `environment=qa` on platform-nonprod.
    - Every other namespace, and the node metrics, get `cluster.environment`. Use the single environment for one-env clusters (media-prod-as1: `prod`; `-prod` is not a namespace suffix, so it falls through to this), and `shared` for multi-env clusters (jitsi-nonprod; media-nonprod-as1: `aauti-media-events`, `media-gateway`; platform-nonprod: `argocd`, `platform-gateway`).
-1. **Tenant.** Use one per product (`jitsi`, `media`, `platform-app`, …) for nonprod and `<product>-prod` for prod (e.g. `media-prod`), not one per cluster. Prod is separate because it's kept 30d (dev/sandbox 7d, qa/demo 10d) and Mimir has only one metrics retention per tenant. Clusters within a tenant are separated by `environment` and `cluster` labels. Add the tenant to the hub `observability/values.yaml`, plus a datasource pair and dashboard provider in `grafana/values.yaml` and `deploy.ps1`.
+1. **Tenant.** Use one per product and tier: `<product>-nonprod` (`jitsi-nonprod`, `media-nonprod`, `platform-nonprod`, …) and `<product>-prod` (e.g. `media-prod`), not one per cluster. Prod is separate because it's kept 30d (dev/sandbox 7d, qa/demo 10d) and Mimir has only one metrics retention per tenant. Clusters within a tenant are separated by `environment` and `cluster` labels. Add the tenant to the hub `observability/values.yaml`, plus a dashboard provider in `grafana/values.yaml` and an entry in `$dashboards` in `deploy.ps1` (no datasources: `Loki` / `Mimir` read every tenant).
 2. **Network.**
    - Hub side: copy `network/aauti-jitsi-nonprod.ps1` and change the spoke project, VPC and peering names. Media and platform VPCs are already peered with the hub; for those, the script only checks the peering (see `network/aauti-media-nonprod.ps1`).
    - Spoke side: check the spoke's ranges don't overlap the hub or any VPC already peered with it.

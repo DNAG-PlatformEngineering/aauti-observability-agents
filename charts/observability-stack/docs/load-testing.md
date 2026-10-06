@@ -1,6 +1,6 @@
 # Load testing with k6
 
-> **In this repo** k6 is enabled on the hub with `tenant: platform` (temporary) and no tests
+> **In this repo** k6 is enabled on the hub with `tenant: aauti-hub` (temporary) and no tests
 > defined, so no CronJobs exist yet. The *k6 load testing* dashboard isn't provisioned in the
 > standalone Grafana.
 

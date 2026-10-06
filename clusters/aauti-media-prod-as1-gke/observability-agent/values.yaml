@@ -15,11 +15,12 @@
 #   Neither secret is stored in this repo; deploy.ps1 copies them from the hub.
 #
 # Tenant "media-prod" (30d retention) is for Media prod clusters; media nonprod
-# uses tenant "media". Within a tenant, clusters are told apart by the cluster label.
+# uses tenant "media-nonprod". Within a tenant, clusters are told apart by the cluster label.
 
 cluster:
   name: aauti-media-prod-as1-gke
   tier: prod
+  product: media            # `product` label (single Loki / Mimir datasource in Grafana)
   # Single-environment cluster: every namespace (aauti-media-<app>-prod,
   # media-gateway, kube-system) and the nodes are "prod". "-prod" is not one
   # of the environmentFromNamespace suffixes, so it falls through to this value.
@@ -30,6 +31,7 @@ agent:
   # Standard for every cluster: environment from the namespace suffix
   # (-dev / -qa / -demo / -sandbox / -uat / -staging), else cluster.environment.
   environmentFromNamespace: { enabled: true }
+  envLabel: { enabled: true }   # also send `environment` as `env`
   hubUrl: https://10.40.16.10
   # Every name carries the cluster name, like the release and namespace. The
   # alloy sub-chart can't template these, so they are repeated under alloy below.

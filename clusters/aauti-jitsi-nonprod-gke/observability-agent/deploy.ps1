@@ -1,10 +1,10 @@
 # Installs the observability agent (Alloy + kube-state-metrics) on
 # aauti-jitsi-nonprod-gke, namespace "observability-agent-jitsinonprod", shipping logs and
-# metrics to the hub (tenant "jitsi") over the private VPC peering.
+# metrics to the hub (tenant "jitsi-nonprod") over the private VPC peering.
 #
 # Prerequisites, in order (see ../README.md):
 #   1. ../../../network/aauti-jitsi-nonprod.ps1        (IP + peering)
-#   2. ../../aauti-hub-as1-obs-gke/observability/deploy.ps1  (tenant jitsi + internal LB)
+#   2. ../../aauti-hub-as1-obs-gke/observability/deploy.ps1  (tenant jitsi-nonprod + internal LB)
 #   3. ../../aauti-hub-as1-obs-gke/grafana/deploy.ps1        (datasources + dashboards)
 #
 # Only creates new objects in the new namespace observability-agent-jitsinonprod (plus the
@@ -16,7 +16,7 @@ param(
   [string] $SpokeContext = "gke_aauti-jitsi-noprod_asia-south1-a_aauti-jitsi-nonprod-gke",
   [string] $Namespace = "observability-agent-jitsinonprod",
   [string] $Release = "observability-agent-jitsinonprod",
-  [string] $Tenant = "jitsi",
+  [string] $Tenant = "jitsi-nonprod",
   [string] $GatewayIp = "10.40.16.10"
 )
 $ErrorActionPreference = "Stop"

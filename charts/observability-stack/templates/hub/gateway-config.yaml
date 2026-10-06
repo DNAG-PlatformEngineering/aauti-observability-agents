@@ -1,6 +1,7 @@
 {{- if and (eq .Values.mode "hub") .Values.gateway.enabled }}
 {{- $name := include "obs.gatewayName" . }}
 {{- $up := .Values.gateway.upstreams }}
+{{- $reader := .Values.gateway.reader }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -30,13 +31,25 @@ data:
       # never from the client. A client-supplied X-Scope-OrgID is accepted
       # only if it equals the caller's own tenant (so "a|b" federation and
       # cross-tenant reads/writes are rejected with 403).
+      # Exception: the read-only reader user (gateway.reader) is pinned by the
+      # gateway to all tenants ("a|b|...", Loki / Mimir tenant federation) and
+      # cannot push.
       # ------------------------------------------------------------------
       map $remote_user $tenant_id {
         default "";
         {{- range $id, $_ := .Values.tenants }}
         "{{ $id }}" "{{ $id }}";
         {{- end }}
+        {{- if $reader.enabled }}
+        "{{ $reader.username }}" "{{ keys .Values.tenants | sortAlpha | join "|" }}";
+        {{- end }}
       }
+      {{- if $reader.enabled }}
+      map $remote_user $read_only {
+        default 0;
+        "{{ $reader.username }}" 1;
+      }
+      {{- end }}
       map "$tenant_id:$http_x_scope_orgid" $tenant_header_ok {
         default        0;
         "~^:"          1;   # not authenticated yet -> let auth_basic answer 401
@@ -86,14 +99,42 @@ data:
         }
 
         # ---------------- Mimir ----------------
+        {{- if $reader.enabled }}
+        location = /api/v1/push {
+          if ($read_only) { return 403 "read-only user\n"; }
+          proxy_pass $mimir_write;
+        }
+        {{- else }}
         location = /api/v1/push            { proxy_pass $mimir_write; }
+        {{- end }}
+        {{- if $reader.enabled }}
+        location = /otlp/v1/metrics {
+          if ($read_only) { return 403 "read-only user\n"; }
+          proxy_pass $mimir_write;
+        }
+        {{- else }}
         location = /otlp/v1/metrics        { proxy_pass $mimir_write; }
+        {{- end }}
         location /prometheus/              { proxy_pass $mimir_read; }
         location = /api/v1/status/buildinfo { proxy_pass $mimir_read; }
 
         # ---------------- Loki -----------------
+        {{- if $reader.enabled }}
+        location = /loki/api/v1/push {
+          if ($read_only) { return 403 "read-only user\n"; }
+          proxy_pass $loki_write;
+        }
+        {{- else }}
         location = /loki/api/v1/push       { proxy_pass $loki_write; }
+        {{- end }}
+        {{- if $reader.enabled }}
+        location = /otlp/v1/logs {
+          if ($read_only) { return 403 "read-only user\n"; }
+          proxy_pass $loki_write;
+        }
+        {{- else }}
         location = /otlp/v1/logs           { proxy_pass $loki_write; }
+        {{- end }}
         location = /loki/api/v1/tail {
           proxy_pass $loki_read;
           proxy_set_header X-Scope-OrgID $tenant_id;

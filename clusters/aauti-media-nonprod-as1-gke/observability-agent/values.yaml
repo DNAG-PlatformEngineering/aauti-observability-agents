@@ -1,7 +1,7 @@
 # Observability agent on aauti-media-nonprod-as1-gke (namespace
 # "observability-agent-medianonprod"). Chart: ../../../charts/observability-stack
 # (spoke mode), layered on its profiles/spoke.yaml. Ships to the hub
-# aauti-hub-as1-obs-gke, tenant "media".
+# aauti-hub-as1-obs-gke, tenant "media-nonprod".
 #
 # - Scope: every namespace of the cluster (logs + metrics + Kubernetes events).
 # - Labels on every series / log stream: cluster, environment, namespace, pod,
@@ -11,25 +11,27 @@
 #   peering media-nonprod-to-hub / hub-to-media-nonprod.
 # - Security: TLS 1.2+ verified against the hub's private CA (Secret
 #   observability-agent-medianonprod-hub-ca) with SNI observability-gateway.observability.svc,
-#   plus basic auth as tenant "media" (Secret observability-agent-medianonprod-auth).
+#   plus basic auth as tenant "media-nonprod" (Secret observability-agent-medianonprod-auth).
 #   Neither secret is stored in this repo; deploy.ps1 copies them from the hub.
 #
-# Tenant "media" is shared by all Media clusters; they are told apart by the
+# Tenant "media-nonprod" is shared by all Media nonprod clusters; they are told apart by the
 # cluster / environment labels.
 
 cluster:
   name: aauti-media-nonprod-as1-gke
   tier: nonprod
+  product: media            # `product` label (single Loki / Mimir datasource in Grafana)
   # One cluster for dev, qa, demo and sandbox (aauti-media-<app>-<env>
   # namespaces get that environment from the suffix). Shared namespaces
   # (aauti-media-events, media-gateway, kube-system) and nodes are "shared".
   environment: shared
 
 agent:
-  tenant: media
+  tenant: media-nonprod
   # Standard for every cluster: environment from the namespace suffix
   # (-dev / -qa / -demo / -sandbox / -uat / -staging), else cluster.environment.
   environmentFromNamespace: { enabled: true }
+  envLabel: { enabled: true }   # also send `environment` as `env`
   hubUrl: https://10.40.16.10
   # Every name carries the cluster name, like the release and namespace. The
   # alloy sub-chart can't template these, so they are repeated under alloy below.

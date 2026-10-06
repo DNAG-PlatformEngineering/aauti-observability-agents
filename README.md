@@ -11,17 +11,28 @@ Secrets (admin passwords, tokens) live only in the cluster, never in this repo.
 | Cluster | Project | Zone | What's deployed |
 |---|---|---|---|
 | [aauti-hub-as1-obs-gke](clusters/aauti-hub-as1-obs-gke/README.md) | Aauti-hub (`aauti-hub`) | asia-south1-a | Hub: Grafana, MinIO, Loki, Mimir, gateway (+ internal LB for spokes), Alloy, kube-state-metrics |
-| [aauti-jitsi-nonprod-gke](clusters/aauti-jitsi-nonprod-gke/README.md) | `aauti-jitsi-noprod` | asia-south1-a | Spoke (tenant `jitsi`): Alloy agent + kube-state-metrics in `observability-agent-jitsinonprod`. **Deployed** 2026-09-30, Grafana folder *Jitsi-nonprod*. The README also defines the standard for onboarding the other clusters. |
-| [aauti-media-nonprod-as1-gke](clusters/aauti-media-nonprod-as1-gke/README.md) | `aauti-media-nonprod` | asia-south1-a | Spoke (tenant `media`): Alloy agent + kube-state-metrics in `observability-agent-medianonprod`. **Deployed** 2026-10-01, Grafana folder *Media-nonprod*. |
-| [aauti-platform-nonprod-as1-gke](clusters/aauti-platform-nonprod-as1-gke/README.md) | `aauti-platform-noprod` | asia-south1-a | Spoke (tenant `platform-app`): Alloy agent + kube-state-metrics in `observability-agent-platformnonprod`. **Deployed** 2026-10-01, Grafana folder *Platform-nonprod*. |
+| [aauti-jitsi-nonprod-gke](clusters/aauti-jitsi-nonprod-gke/README.md) | `aauti-jitsi-noprod` | asia-south1-a | Spoke (tenant `jitsi-nonprod`): Alloy agent + kube-state-metrics in `observability-agent-jitsinonprod`. **Deployed** 2026-09-30, Grafana folder *Jitsi-nonprod*. The README also defines the standard for onboarding the other clusters. |
+| [aauti-media-nonprod-as1-gke](clusters/aauti-media-nonprod-as1-gke/README.md) | `aauti-media-nonprod` | asia-south1-a | Spoke (tenant `media-nonprod`): Alloy agent + kube-state-metrics in `observability-agent-medianonprod`. **Deployed** 2026-10-01, Grafana folder *Media-nonprod*. |
+| [aauti-platform-nonprod-as1-gke](clusters/aauti-platform-nonprod-as1-gke/README.md) | `aauti-platform-noprod` | asia-south1-a | Spoke (tenant `platform-nonprod`): Alloy agent + kube-state-metrics in `observability-agent-platformnonprod`. **Deployed** 2026-10-01, Grafana folder *Platform-nonprod*. |
 | [aauti-media-prod-as1-gke](clusters/aauti-media-prod-as1-gke/README.md) | `aauti-media-prod` | asia-south1 (regional) | Spoke (tenant `media-prod`): Alloy agent + kube-state-metrics in `observability-agent-mediaprod`. **Deployed** 2026-10-06, Grafana folder *Media-prod*. |
 
 `network/` holds the VPC peering / internal IP scripts, one per spoke VPC. They are idempotent and support `-WhatIf`
 (media-nonprod's, platform-nonprod's and media-prod's peerings already existed, so their scripts only check them).
 
-Retention policy: dev and sandbox 7 days, qa and demo 10 days, prod 30 days. Nonprod clusters share one tenant per product
-(`media`, `platform-app`, `jitsi`), prod clusters get `<product>-prod` (`media-prod`), because Mimir has only one metrics
-retention per tenant. Per-tenant values: [hub README](clusters/aauti-hub-as1-obs-gke/README.md).
+Retention policy: dev and sandbox 7 days, qa and demo 10 days, prod 30 days. Tenants are per product and tier:
+`<product>-nonprod` (`media-nonprod`, `platform-nonprod`, `jitsi-nonprod`) and `<product>-prod` (`media-prod`), because Mimir
+has only one metrics retention per tenant. The hub monitors itself as `aauti-hub`. Per-tenant values: [hub README](clusters/aauti-hub-as1-obs-gke/README.md).
+
+**Explore in Grafana:** one `Loki` and one `Mimir` datasource (the default) read all tenants at once. Filter with labels:
+
+```
+product     media | jitsi | platform | aauti-hub
+  env       dev | qa | demo | sandbox | shared | prod     (same values as `environment`)
+    cluster → namespace → app / pod / container
+```
+e.g. `{product="media", env="qa"} |= "error"` (Loki), `kube_pod_container_status_restarts_total{product="platform", env="dev"}` (Mimir).
+`product` / `env` exist on data sent since 2026-10-06; for older data filter on `cluster` / `environment`. There are no
+per-tenant datasources; the folder dashboards use `Loki` / `Mimir`, each folder limited to its tenant's clusters.
 
 ## Charts
 
@@ -33,4 +44,7 @@ with its sub-charts vendored. Changes, all opt-in (defaults render as before):
 - `agent.logs.environmentFromLine`: environment taken from the log line (Jitsi room names).
 - `agent.configMapName`, `agent.auth.secretName`, `agent.tls.caSecretName`: names of the agent's
   ConfigMap and Secrets, so every agent object can carry the cluster name.
-- Dashboards: an `environment` variable, and a *Jitsi Meet* dashboard (`dashboards/tenants/jitsi/`).
+- Dashboards: an `environment` variable, and a *Jitsi Meet* dashboard (`dashboards/tenants/jitsi-nonprod/`).
+- `cluster.product`: `product` label on all data; `agent.envLabel`: `env` alias of the final `environment`.
+- `gateway.reader`: a read-only gateway user pinned to all tenants (Loki / Mimir tenant federation) for Grafana's
+  single `Loki` / `Mimir` datasources; push returns 403 for it.

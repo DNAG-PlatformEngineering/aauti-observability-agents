@@ -5,9 +5,10 @@ param(
   [string] $SpokeContext = "gke_aauti-jitsi-noprod_asia-south1-a_aauti-jitsi-nonprod-gke",
   [string] $Namespace = "observability-agent-jitsinonprod",
   [string] $Release = "observability-agent-jitsinonprod",
-  [string] $Tenant = "jitsi",
+  [string] $Tenant = "jitsi-nonprod",
   [string] $Cluster = "aauti-jitsi-nonprod-gke",
   [string] $GatewayIp = "10.40.16.10",
+  [string] $Product = "jitsi",
   [string] $GrafanaUrl = "https://grafana.aauti.ai"
 )
 $fail = 0
@@ -58,18 +59,24 @@ $cred = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("admin:" + [Tex
 $h = @{ Authorization = "Basic $cred" }
 $q = { param($uid, $path, $query) Invoke-RestMethod -Headers $h -Uri "$GrafanaUrl/api/datasources/proxy/uid/$uid/$path`?query=$([uri]::EscapeDataString($query))" }
 try {
-  $m = & $q "mimir-$Tenant" "api/v1/query" "count by (environment, namespace) ({cluster=`"$Cluster`"})"
+  $m = & $q "mimir" "api/v1/query" "count by (environment, namespace) ({cluster=`"$Cluster`"})"
   $ns = $m.data.result | ForEach-Object { "$($_.metric.namespace)=$($_.value[1])" }
   Check ($m.data.result.Count -gt 0) "metrics: series per namespace: $($ns -join ' ')"
   Check (($m.data.result.metric.environment | Sort-Object -Unique) -contains "shared") "metrics carry environment=shared (all: $(($m.data.result.metric.environment | Sort-Object -Unique) -join ','))"
-  $j = & $q "mimir-$Tenant" "api/v1/query" "sum(jitsi_participants{cluster=`"$Cluster`"})"
+  $j = & $q "mimir" "api/v1/query" "sum(jitsi_participants{cluster=`"$Cluster`"})"
   Check ($j.data.result.Count -gt 0) "Jitsi app metrics present (JVB jitsi_participants)"
-  $t = & $q "mimir-$Tenant" "api/v1/query" "count({cluster=`"$Cluster`", tier=`"nonprod`"})"
+  $t = & $q "mimir" "api/v1/query" "count({cluster=`"$Cluster`", tier=`"nonprod`"})"
   Check ($t.data.result.Count -gt 0) "metrics carry tier=nonprod"
-  $l = & $q "loki-$Tenant" "loki/api/v1/query" "sum by (environment, namespace) (count_over_time({cluster=`"$Cluster`"}[10m]))"
+  $l = & $q "loki" "loki/api/v1/query" "sum by (environment, namespace) (count_over_time({cluster=`"$Cluster`"}[10m]))"
   $lns = $l.data.result | ForEach-Object { "$($_.metric.namespace)=$($_.value[1])" }
   Check ($l.data.result.Count -gt 0) "logs: lines per namespace (10m): $($lns -join ' ')"
   Check (($l.data.result.metric.environment | Sort-Object -Unique) -contains "shared") "logs carry environment=shared (all: $(($l.data.result.metric.environment | Sort-Object -Unique) -join ','))"
+  # Single "Loki" / "Mimir" datasources (federated over all tenants, user grafana-reader).
+  $fm = & $q "mimir" "api/v1/query" "count by (__tenant_id__, env) ({cluster=`"$Cluster`", product=`"$Product`"})"
+  $ft = ($fm.data.result.metric.__tenant_id__ | Sort-Object -Unique) -join ","
+  Check ($fm.data.result.Count -gt 0 -and $ft -eq $Tenant -and -not ($fm.data.result.metric | Where-Object { -not $_.env })) "federated Mimir: product=$Product, env set, tenant $ft"
+  $fl = & $q "loki" "loki/api/v1/query" "sum by (__tenant_id__, env) (count_over_time({cluster=`"$Cluster`", product=`"$Product`"}[10m]))"
+  Check ($fl.data.result.Count -gt 0 -and -not ($fl.data.result.metric | Where-Object { -not $_.env })) "federated Loki: product=$Product, env set ($(($fl.data.result.metric.env | Sort-Object -Unique) -join ','))"
 } catch { Check $false "Grafana query failed: $($_.Exception.Message)" }
 
 Write-Host ""

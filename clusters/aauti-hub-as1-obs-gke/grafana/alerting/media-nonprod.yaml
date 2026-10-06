@@ -1,4 +1,4 @@
-# Grafana-managed alert rules for aauti-media-nonprod-as1-gke (tenant "media").
+# Grafana-managed alert rules for aauti-media-nonprod-as1-gke (tenant "media-nonprod").
 # Provisioned by ../deploy.ps1 (ConfigMap grafana-alerting-rules, mounted into
 # /etc/grafana/provisioning/alerting). Edit here, then run deploy.ps1; rules
 # are read-only in the Grafana UI.
@@ -29,7 +29,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: mimir-media
+            datasourceUid: mimir
             relativeTimeRange: { from: 600, to: 0 }
             model:
               refId: A
@@ -41,17 +41,17 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 5m
-        labels: { severity: warning, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: warning, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "{{ .Labels.namespace }}/{{ .Labels.pod }} ({{ .Labels.container }}) is in CrashLoopBackOff"
-          description: "Container keeps crashing in environment {{ .Labels.environment }}. Check its logs in Grafana (Loki - Media) and the last termination reason."
+          description: "Container keeps crashing in environment {{ .Labels.environment }}. Check its logs in Grafana (Explore: Loki, cluster aauti-media-nonprod-as1-gke) and the last termination reason."
 
       - uid: media-np-image-pull
         title: Image pull failing
         condition: C
         data:
           - refId: A
-            datasourceUid: mimir-media
+            datasourceUid: mimir
             relativeTimeRange: { from: 600, to: 0 }
             model:
               refId: A
@@ -63,7 +63,7 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 10m
-        labels: { severity: warning, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: warning, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "{{ .Labels.namespace }}/{{ .Labels.pod }} cannot pull its image ({{ .Labels.reason }})"
           description: "Wrong tag, missing image or registry permissions, environment {{ .Labels.environment }}."
@@ -73,7 +73,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: mimir-media
+            datasourceUid: mimir
             relativeTimeRange: { from: 1800, to: 0 }
             model:
               refId: A
@@ -88,7 +88,7 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 0s
-        labels: { severity: warning, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: warning, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "{{ .Labels.namespace }}/{{ .Labels.pod }} ({{ .Labels.container }}) was OOMKilled"
           description: "The container hit its memory limit and was restarted, environment {{ .Labels.environment }}. Raise the limit or fix the leak."
@@ -98,7 +98,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: mimir-media
+            datasourceUid: mimir
             relativeTimeRange: { from: 3600, to: 0 }
             model:
               refId: A
@@ -110,7 +110,7 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 0s
-        labels: { severity: warning, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: warning, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "{{ .Labels.namespace }}/{{ .Labels.pod }} ({{ .Labels.container }}) restarted {{ .Value }} times in 1h"
           description: "More than 3 restarts in the last hour, environment {{ .Labels.environment }}."
@@ -120,7 +120,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: mimir-media
+            datasourceUid: mimir
             relativeTimeRange: { from: 600, to: 0 }
             model:
               refId: A
@@ -132,7 +132,7 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 15m
-        labels: { severity: warning, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: warning, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "{{ .Labels.namespace }}/{{ .Labels.deployment }} has {{ .Value }} unavailable replica(s)"
           description: "Unavailable for 15 minutes in environment {{ .Labels.environment }} (failed rollout, crashing pods or no capacity)."
@@ -142,7 +142,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: mimir-media
+            datasourceUid: mimir
             relativeTimeRange: { from: 600, to: 0 }
             model:
               refId: A
@@ -154,7 +154,7 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 15m
-        labels: { severity: warning, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: warning, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "{{ .Labels.namespace }}/{{ .Labels.pod }} has been {{ .Labels.phase }} for 15m"
           description: "Usually unschedulable (CPU / memory requests, node pool max size) or a volume that can't attach. Environment {{ .Labels.environment }}."
@@ -164,7 +164,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: mimir-media
+            datasourceUid: mimir
             relativeTimeRange: { from: 600, to: 0 }
             model:
               refId: A
@@ -179,7 +179,7 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 15m
-        labels: { severity: warning, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: warning, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "{{ .Labels.namespace }}/{{ .Labels.horizontalpodautoscaler }} is pinned at its max replicas"
           description: "The autoscaler can't add more pods (at maxReplicas for 15m), environment {{ .Labels.environment }}."
@@ -189,7 +189,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: mimir-media
+            datasourceUid: mimir
             relativeTimeRange: { from: 600, to: 0 }
             model:
               refId: A
@@ -204,7 +204,7 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 15m
-        labels: { severity: warning, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: warning, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "{{ .Labels.namespace }}/{{ .Labels.pod }} ({{ .Labels.container }}) uses {{ humanizePercentage .Value }} of its memory limit"
           description: "Above 90% for 15 minutes; an OOMKill is likely next. Environment {{ .Labels.environment }}."
@@ -214,7 +214,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: mimir-media
+            datasourceUid: mimir
             relativeTimeRange: { from: 600, to: 0 }
             model:
               refId: A
@@ -229,7 +229,7 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 10m
-        labels: { severity: warning, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: warning, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "PVC {{ .Labels.namespace }}/{{ .Labels.persistentvolumeclaim }} is {{ humanizePercentage .Value }} full"
           description: "Above 85%. Expand the volume or clean up, environment {{ .Labels.environment }}."
@@ -242,7 +242,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: mimir-media
+            datasourceUid: mimir
             relativeTimeRange: { from: 600, to: 0 }
             model:
               refId: A
@@ -254,7 +254,7 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 5m
-        labels: { severity: critical, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: critical, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "Node {{ .Labels.node }} is NotReady"
           description: "Pods on this node are not being served. Check the node in GKE (aauti-media-nonprod, aauti-media-nonprod-as1-gke)."
@@ -264,7 +264,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: mimir-media
+            datasourceUid: mimir
             relativeTimeRange: { from: 600, to: 0 }
             model:
               refId: A
@@ -276,7 +276,7 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 5m
-        labels: { severity: warning, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: warning, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "Node {{ .Labels.node }} reports {{ .Labels.condition }}"
           description: "The kubelet will start evicting pods from this node."
@@ -289,7 +289,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: loki-media
+            datasourceUid: loki
             relativeTimeRange: { from: 300, to: 0 }
             queryType: instant
             model:
@@ -302,7 +302,7 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 10m
-        labels: { severity: warning, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: warning, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "{{ .Labels.namespace }} logged {{ .Value }} error lines in 5m"
           description: "More than 50 error/fatal lines per 5 minutes for 10 minutes, environment {{ .Labels.environment }}. Baseline on 2026-10-05: no error-level lines in 24h."
@@ -315,7 +315,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: mimir-media
+            datasourceUid: mimir
             relativeTimeRange: { from: 900, to: 0 }
             model:
               refId: A
@@ -327,7 +327,7 @@ groups:
         noDataState: OK
         execErrState: Error
         for: 5m
-        labels: { severity: critical, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: critical, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "No metrics from aauti-media-nonprod-as1-gke for 10m"
           description: "The agent (namespace observability-agent-medianonprod) is down or can't reach the hub gateway (network, TLS, password). Run observability-agent/verify.ps1."
@@ -337,7 +337,7 @@ groups:
         condition: C
         data:
           - refId: A
-            datasourceUid: loki-media
+            datasourceUid: loki
             relativeTimeRange: { from: 600, to: 0 }
             queryType: instant
             model:
@@ -351,7 +351,7 @@ groups:
         noDataState: Alerting
         execErrState: Error
         for: 5m
-        labels: { severity: critical, tenant: media, cluster: aauti-media-nonprod-as1-gke }
+        labels: { severity: critical, tenant: media-nonprod, cluster: aauti-media-nonprod-as1-gke }
         annotations:
           summary: "No logs from aauti-media-nonprod-as1-gke for 10m"
           description: "The agent (namespace observability-agent-medianonprod) is down or can't reach the hub gateway (network, TLS, password). Run observability-agent/verify.ps1."

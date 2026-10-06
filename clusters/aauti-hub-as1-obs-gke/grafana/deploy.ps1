@@ -34,10 +34,11 @@ if ($LASTEXITCODE -ne 0) {
   kubectl -n $Namespace create secret generic grafana-admin --from-literal=admin-user=admin --from-literal=admin-password=$pw
 }
 
-# Tenants that have datasources in values.yaml (password key per tenant).
-$tenants = @("platform", "jitsi", "media", "media-prod", "platform-app")
+# Gateway users whose password the datasources need: only the read-only
+# federated user of the "Loki" / "Mimir" datasources (all tenants).
+$tenants = @("grafana-reader")
 
-# Datasource credentials: copy each tenant password + the gateway CA from the
+# Datasource credentials: copy the reader password + the gateway CA from the
 # observability namespace (Secrets can't be read across namespaces). Re-running
 # picks up rotations.
 $b64 = { param($s, $k) kubectl -n observability get secret $s -o jsonpath="{.data.$k}" }
@@ -46,7 +47,7 @@ if (-not $caB64) { throw "observability release not found - deploy ../observabil
 $data = "  ca.crt: $caB64"
 foreach ($t in $tenants) {
   $pwB64 = & $b64 observability-tenant-credentials $t
-  if (-not $pwB64) { throw "tenant '$t' has no password yet - add it to ../observability/values.yaml and deploy that first" }
+  if (-not $pwB64) { throw "'$t' has no password yet - add it to ../observability/values.yaml (tenants / gateway.reader) and deploy that first" }
   $data += "`n  ${t}: $pwB64"
 }
 @"
@@ -60,13 +61,16 @@ $data
 if ($LASTEXITCODE -ne 0) { throw "creating grafana-hub-datasource failed" }
 
 # Dashboards: ConfigMap grafana-dashboards-<tenant> per provider in values.yaml,
-# rendered from the chart's dashboard templates with the tenant's datasource UIDs.
+# rendered from the chart's dashboard templates on the "Loki" / "Mimir"
+# datasources (all tenants). Each folder's Cluster variable lists only its own
+# tenant's clusters (__tenant_id__), and "All" means exactly those clusters
+# (no ".+" all-value), so every panel stays within the folder's tenant.
 $dashDir = Resolve-Path "$PSScriptRoot/../../../charts/observability-stack/dashboards"
 $dashboards = @{
-  jitsi = @{ title = "Jitsi-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("workloads-logs") }   # cluster-health / resource-usage: Jitsi variants in dashboards/tenants/jitsi (+ per-environment rows)
-  media = @{ title = "Media-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
+  "jitsi-nonprod" = @{ title = "Jitsi-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("workloads-logs") }   # cluster-health / resource-usage: Jitsi variants in dashboards/tenants/jitsi (+ per-environment rows)
+  "media-nonprod" = @{ title = "Media-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
   "media-prod" = @{ title = "Media-prod"; environments = "prod"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
-  "platform-app" = @{ title = "Platform-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
+  "platform-nonprod" = @{ title = "Platform-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
 }
 foreach ($t in $dashboards.Keys) {
   $tmp = Join-Path ([IO.Path]::GetTempPath()) "grafana-dashboards-$t"
@@ -76,9 +80,12 @@ foreach ($t in $dashboards.Keys) {
   $files += @(Get-ChildItem "$dashDir/tenants/$t" -Filter *.json -ErrorAction SilentlyContinue)
   foreach ($f in $files) {
     $json = [IO.File]::ReadAllText($f.FullName).
-      Replace("__METRICS_DS__", "mimir-$t").Replace("__LOGS_DS__", "loki-$t").
+      Replace("__METRICS_DS__", "mimir").Replace("__LOGS_DS__", "loki").
       Replace("__TENANT_TITLE__", $dashboards[$t].title).Replace("__TENANT__", $t).
-      Replace("__ENVIRONMENTS__", $dashboards[$t].environments)
+      Replace("__ENVIRONMENTS__", $dashboards[$t].environments).
+      Replace('label_values(up, cluster)', "label_values(up{__tenant_id__=\`"$t\`"}, cluster)")
+    $json = [regex]::Replace($json, '(?s)(label_values\(up\{__tenant_id__=[^}]*\}, cluster\)".*?)"allValue": "\.\+",\s*', '$1')
+    if ($json -match 'label_values\(up, cluster\)') { throw "$($f.Name): Cluster variable not restricted to tenant $t" }
     [IO.File]::WriteAllText((Join-Path $tmp "$t-$($f.Name)"), $json)
   }
   # Server-side apply: dashboards exceed the client-side last-applied annotation limit.

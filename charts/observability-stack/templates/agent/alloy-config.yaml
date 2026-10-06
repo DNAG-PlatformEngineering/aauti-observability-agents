@@ -15,7 +15,13 @@
 {{- /* Optional per-line environment (e.g. from a meeting room name in the line):
      ... -> loki.relabel.environment -> loki.process.line_environment -> loki.write */}}
 {{- $lineEnv := $a.logs.environmentFromLine.enabled }}
-{{- $lwrite := ternary "loki.process.line_environment.receiver" "loki.write.hub.receiver" $lineEnv }}
+{{- /* Optional `env` alias of the final `environment`: a constant external label
+     when environment is per cluster, else copied by a last relabel stage
+     (logs: loki.relabel.env_alias right before loki.write). */}}
+{{- $envAlias := $a.envLabel.enabled }}
+{{- $envCopy := and $envAlias $envNs }}
+{{- $lfinal := ternary "loki.relabel.env_alias.receiver" "loki.write.hub.receiver" $envCopy }}
+{{- $lwrite := ternary "loki.process.line_environment.receiver" $lfinal $lineEnv }}
 {{- $lout := ternary "loki.relabel.environment.receiver" $lwrite $envNs }}
 apiVersion: v1
 kind: ConfigMap
@@ -111,9 +117,15 @@ data:
         cluster     = "{{ .Values.cluster.name }}",
         {{- if not $envNs }}
         environment = "{{ .Values.cluster.environment }}",
+        {{- if $envAlias }}
+        env         = "{{ .Values.cluster.environment }}",
+        {{- end }}
         {{- end }}
         {{- with .Values.cluster.tier }}
         tier        = "{{ . }}",
+        {{- end }}
+        {{- with .Values.cluster.product }}
+        product     = "{{ . }}",
         {{- end }}
       }
     }
@@ -136,6 +148,13 @@ data:
         replacement   = "{{ .Values.cluster.environment }}"
         target_label  = "environment"
       }
+      {{- if $envCopy }}
+      // env = final environment (agent.envLabel)
+      rule {
+        source_labels = ["environment"]
+        target_label  = "env"
+      }
+      {{- end }}
     }
     {{- end }}
 
@@ -450,9 +469,15 @@ data:
         cluster     = "{{ .Values.cluster.name }}",
         {{- if not $envNs }}
         environment = "{{ .Values.cluster.environment }}",
+        {{- if $envAlias }}
+        env         = "{{ .Values.cluster.environment }}",
+        {{- end }}
         {{- end }}
         {{- with .Values.cluster.tier }}
         tier        = "{{ . }}",
+        {{- end }}
+        {{- with .Values.cluster.product }}
+        product     = "{{ . }}",
         {{- end }}
       }
     }
@@ -483,12 +508,24 @@ data:
     // Lines that name their own environment (regex group "env") get it as the
     // `environment` label; all other lines keep the namespace / cluster value.
     loki.process "line_environment" {
-      forward_to = [loki.write.hub.receiver]
+      forward_to = [{{ $lfinal }}]
       stage.regex {
         expression = {{ $a.logs.environmentFromLine.regex | quote }}
       }
       stage.labels {
         values = { environment = "env" }
+      }
+    }
+    {{- end }}
+
+    {{- if $envCopy }}
+
+    // env = final environment (agent.envLabel), after any per-line override.
+    loki.relabel "env_alias" {
+      forward_to = [loki.write.hub.receiver]
+      rule {
+        source_labels = ["environment"]
+        target_label  = "env"
       }
     }
     {{- end }}

@@ -30,6 +30,9 @@ cluster:
   environment: nonprod
   # -- Optional `tier` label on everything (prod | nonprod). Empty = not added.
   tier: ""
+  # -- Optional `product` label on everything (e.g. media, jitsi). Lets one
+  # federated datasource filter by product across tenants. Empty = not added.
+  product: ""
 
 # =============================================================================
 # AGENT (both modes) — what the local Alloy collects and where it sends it
@@ -77,6 +80,11 @@ agent:
   environmentFromNamespace:
     enabled: false
     regex: "(?:.*-)?(dev|qa|demo|sandbox|uat|staging)"
+
+  # -- Also send the final `environment` value as `env` (a shorter alias; same
+  # value, including per-line environments). `environment` is kept.
+  envLabel:
+    enabled: false
 
   # -- Name of the ConfigMap with the generated Alloy config. When changed,
   # also set alloy.alloy.configMap.name to the same name.
@@ -180,6 +188,15 @@ tenantFolderPermission: View
 gateway:
   enabled: false
   replicas: 1
+  # -- Read-only user that queries ALL tenants at once (Loki / Mimir tenant
+  # federation), for a single Grafana datasource per signal. Its X-Scope-OrgID
+  # is set by the gateway to every tenant id joined with "|"; push endpoints
+  # return 403 for it. Its password is generated like a tenant's and stored in
+  # observability-tenant-credentials under `username`. Needs Loki
+  # querier.multi_tenant_queries_enabled and Mimir tenant_federation.enabled.
+  reader:
+    enabled: false
+    username: grafana-reader
   image:
     repository: docker.io/nginxinc/nginx-unprivileged
     tag: 1.29-alpine

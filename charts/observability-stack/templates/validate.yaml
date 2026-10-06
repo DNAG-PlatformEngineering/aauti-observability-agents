@@ -31,6 +31,14 @@
 {{- if and .Values.alloy.enabled (not (hasKey .Values.tenants .Values.agent.tenant)) }}
 {{- fail (printf "agent.tenant %q (hub self-monitoring) is not defined in tenants" .Values.agent.tenant) }}
 {{- end }}
+{{- if .Values.gateway.reader.enabled }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9_-]*$" .Values.gateway.reader.username) }}
+{{- fail "gateway.reader.username must match ^[a-z0-9][a-z0-9_-]*$" }}
+{{- end }}
+{{- if hasKey .Values.tenants .Values.gateway.reader.username }}
+{{- fail (printf "gateway.reader.username %q is also a tenant id; pick another name" .Values.gateway.reader.username) }}
+{{- end }}
+{{- end }}
 {{- if and .Values.k6.enabled (not (hasKey .Values.tenants .Values.k6.tenant)) }}
 {{- fail (printf "k6.tenant %q is not defined in tenants" .Values.k6.tenant) }}
 {{- end }}

@@ -24,5 +24,10 @@ if ($LASTEXITCODE -ne 0) { throw "helm install failed" }
 kubectl --context $ctx apply -f "$PSScriptRoot/gateway-internal-lb.yaml"
 if ($LASTEXITCODE -ne 0) { throw "applying gateway-internal-lb.yaml failed" }
 
+# The hub agent reads its tenant password only at start-up (tenant rename,
+# password rotation), like the spokes.
+kubectl --context $ctx -n $Namespace rollout restart statefulset/observability-alloy
+kubectl --context $ctx -n $Namespace rollout status statefulset/observability-alloy --timeout 5m
+
 kubectl --context $ctx -n $Namespace get pods
 kubectl --context $ctx -n $Namespace get svc observability-gateway-internal

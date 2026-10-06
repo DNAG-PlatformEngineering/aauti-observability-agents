@@ -1,6 +1,6 @@
 # Observability agent on aauti-jitsi-nonprod-gke (namespace "observability-agent-jitsinonprod").
 # Chart: ../../../charts/observability-stack (spoke mode), layered on its
-# profiles/spoke.yaml. Ships to the hub aauti-hub-as1-obs-gke, tenant "jitsi".
+# profiles/spoke.yaml. Ships to the hub aauti-hub-as1-obs-gke, tenant "jitsi-nonprod".
 #
 # - Scope: every namespace of the cluster (logs + metrics + Kubernetes events).
 # - Labels on every series / log stream: cluster, environment, namespace, pod,
@@ -10,15 +10,16 @@
 #   peering jitsi-nonprod-to-hub / hub-to-jitsi-nonprod. Nothing is public.
 # - Security: TLS 1.2+ verified against the hub's private CA (Secret
 #   observability-agent-jitsinonprod-hub-ca) with SNI observability-gateway.observability.svc,
-#   plus basic auth as tenant "jitsi" (Secret observability-agent-jitsinonprod-auth).
+#   plus basic auth as tenant "jitsi-nonprod" (Secret observability-agent-jitsinonprod-auth).
 #   Neither secret is stored in this repo; deploy.ps1 copies them from the hub.
 #
-# Tenant "jitsi" is shared by all Jitsi clusters; they are told apart by the
+# Tenant "jitsi-nonprod" is shared by all Jitsi nonprod clusters; they are told apart by the
 # cluster / environment labels (prod will use environment: prod).
 
 cluster:
   name: aauti-jitsi-nonprod-gke
   tier: nonprod
+  product: jitsi            # `product` label (single Loki / Mimir datasource in Grafana)
   # One Jitsi (devvideo.aauti.com) serves dev, qa, demo and sandbox; the
   # environment is chosen per meeting via the room name
   # (<title>-<entity>-aauti-<env>, recordings ...-recording-<env>). Pods, nodes
@@ -27,10 +28,11 @@ cluster:
   environment: shared
 
 agent:
-  tenant: jitsi
+  tenant: jitsi-nonprod
   # Standard for every cluster: environment from the namespace suffix
   # (-dev / -qa / -demo / -sandbox / -uat / -staging), else cluster.environment.
   environmentFromNamespace: { enabled: true }
+  envLabel: { enabled: true }   # also send `environment` as `env`
   hubUrl: https://10.40.16.10
   # Every name carries the cluster name, like the release and namespace. The
   # alloy sub-chart can't template these, so they are repeated under alloy below.

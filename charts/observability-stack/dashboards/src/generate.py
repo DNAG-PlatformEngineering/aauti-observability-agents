@@ -548,9 +548,9 @@ if __name__ == "__main__":
         "workloads-logs": workloads_logs,
         "tenant-usage": tenant_usage,
         "k6-load-testing": k6_load_testing,
-        "tenants/jitsi/jitsi-meet": jitsi_meet,
-        "tenants/jitsi/cluster-health": lambda: cluster_health(jitsi_health_rows),
-        "tenants/jitsi/resource-usage": lambda: resource_usage(jitsi_usage_rows),
+        "tenants/jitsi-nonprod/jitsi-meet": jitsi_meet,
+        "tenants/jitsi-nonprod/cluster-health": lambda: cluster_health(jitsi_health_rows),
+        "tenants/jitsi-nonprod/resource-usage": lambda: resource_usage(jitsi_usage_rows),
     }.items():
         out = OUT / f"{name}.json"
         out.parent.mkdir(parents=True, exist_ok=True)

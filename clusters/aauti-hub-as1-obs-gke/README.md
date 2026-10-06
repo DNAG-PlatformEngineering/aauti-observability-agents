@@ -23,20 +23,20 @@
 
   | Tenant | Source | Agent namespace | Grafana folder | Status |
   |---|---|---|---|---|
-  | `platform` | this cluster | `observability` | — | deployed |
-  | `jitsi` | [aauti-jitsi-nonprod-gke](../aauti-jitsi-nonprod-gke/README.md) (asia-south1-a) | `observability-agent-jitsinonprod` | Jitsi-nonprod | deployed |
-  | `media` | [aauti-media-nonprod-as1-gke](../aauti-media-nonprod-as1-gke/README.md) (asia-south1-a) | `observability-agent-medianonprod` | Media-nonprod | deployed |
+  | `aauti-hub` | this cluster (self-monitoring; was `platform` until 2026-10-06) | `observability` | — | deployed |
+  | `jitsi-nonprod` | [aauti-jitsi-nonprod-gke](../aauti-jitsi-nonprod-gke/README.md) (asia-south1-a) | `observability-agent-jitsinonprod` | Jitsi-nonprod | deployed |
+  | `media-nonprod` | [aauti-media-nonprod-as1-gke](../aauti-media-nonprod-as1-gke/README.md) (asia-south1-a) | `observability-agent-medianonprod` | Media-nonprod | deployed |
   | `media-prod` | [aauti-media-prod-as1-gke](../aauti-media-prod-as1-gke/README.md) (asia-south1, regional) | `observability-agent-mediaprod` | Media-prod | deployed |
-  | `platform-app` | [aauti-platform-nonprod-as1-gke](../aauti-platform-nonprod-as1-gke/README.md) (asia-south1-a) | `observability-agent-platformnonprod` | Platform-nonprod | deployed |
+  | `platform-nonprod` | [aauti-platform-nonprod-as1-gke](../aauti-platform-nonprod-as1-gke/README.md) (asia-south1-a) | `observability-agent-platformnonprod` | Platform-nonprod | deployed |
 - **Retention** (`observability/values.yaml`, per tenant):
 
   | Tenant | Logs (Loki) | Metrics (Mimir) |
   |---|---|---|
-  | `jitsi` | 7d, all environments | 7d |
-  | `media` | dev, sandbox, shared 7d; qa, demo 10d (`streamRetention` on `environment`) | 10d (Mimir has one retention per tenant, so qa/demo's 10d applies to all) |
+  | `jitsi-nonprod` | 7d, all environments | 7d |
+  | `media-nonprod` | dev, sandbox, shared 7d; qa, demo 10d (`streamRetention` on `environment`) | 10d (Mimir has one retention per tenant, so qa/demo's 10d applies to all) |
   | `media-prod` | 30d | 30d (own tenant because of this; prod policy) |
-  | `platform-app` | dev, sandbox, shared 7d; qa, demo 10d | 10d |
-  | `platform` | 14d | 30d |
+  | `platform-nonprod` | dev, sandbox, shared 7d; qa, demo 10d | 10d |
+  | `aauti-hub` | 14d | 30d |
 
 - **Spoke ingest (private):** `observability-gateway-internal` ([gateway-internal-lb.yaml](observability/gateway-internal-lb.yaml))
   is an internal LB on 10.40.16.10 (ingest subnet) reached over VPC peering. It's source-ranged to each spoke's node and pod CIDRs
@@ -45,13 +45,18 @@
   spokes in asia-south1 can reach it; a spoke in another region needs the annotation
   `networking.gke.io/internal-load-balancer-allow-global-access: "true"`.
   Spokes verify TLS with SNI `observability-gateway.observability.svc`, a SAN of the existing gateway certificate.
-- **Alloy + kube-state-metrics** collect this whole cluster into tenant `platform`.
-- **Grafana datasources:** `Loki – Jitsi` / `Mimir – Jitsi` (user `jitsi`, folder *Jitsi-nonprod*) and `Loki – Media` / `Mimir – Media`
-  (user `media`, folder *Media-nonprod*), `Loki – Media-prod` / `Mimir – Media-prod` (user `media-prod`, folder *Media-prod*) and `Loki – Platform-app` / `Mimir – Platform-app` (user `platform-app`,
-  folder *Platform-nonprod*) work the same way as the platform pair below. Each pair can only read its own tenant.
-  `Loki – Platform` and `Mimir – Platform` (the default) connect over HTTPS to
-  `observability-gateway.observability.svc` and verify the gateway CA. They use basic auth `platform` and send `X-Scope-OrgID: platform`.
-  `grafana/deploy.ps1` copies the password and CA into Secret `grafana-hub-datasource`, so run it again after rotating either.
+- **Alloy + kube-state-metrics** collect this whole cluster into tenant `aauti-hub`.
+- **Grafana datasources, all tenants:** `Loki` and `Mimir` (the default) log in as the read-only gateway user
+  `grafana-reader` (`gateway.reader` in `observability/values.yaml`). The gateway sets its `X-Scope-OrgID` to every tenant
+  (`aauti-hub|jitsi-nonprod|media-nonprod|media-prod|platform-nonprod`, Loki `multi_tenant_queries_enabled`, Mimir
+  `tenant_federation`) and returns 403 if it tries to push. Results carry `__tenant_id__`; filter with `product` / `env` /
+  `cluster` / `namespace` / `app` / `pod` / `container`. A new tenant is included automatically after `observability/deploy.ps1`.
+- **No per-tenant datasources** (removed 2026-10-06, so Explore lists only `Loki` and `Mimir`). The folder dashboards
+  (*Jitsi-nonprod*, *Media-nonprod*, *Media-prod*, *Platform-nonprod*) use `Loki` / `Mimir` too; `grafana/deploy.ps1`
+  limits each folder's *Cluster* variable to its own tenant (`label_values(up{__tenant_id__="<tenant>"}, cluster)`, "All" =
+  those clusters only), and every panel filters on `$cluster`, so a folder never shows another tenant's data.
+  The datasources connect over HTTPS to `observability-gateway.observability.svc` and verify the gateway CA.
+  `grafana/deploy.ps1` copies the `grafana-reader` password and the CA into Secret `grafana-hub-datasource`, so run it again after rotating either.
 - Every pod runs on node pool `observability`. The chart copy adds `scheduling` for its own gateway and bucket Job.
 - Tenant passwords are in Secret `observability-tenant-credentials`, and the gateway CA is in `observability-hub-ca`.
 
@@ -60,6 +65,9 @@ Deploy / upgrade:
 ```powershell
 ./observability/deploy.ps1
 ```
+
+It also restarts the hub's Alloy, which reads its tenant password only at start-up. After adding or renaming a
+tenant, redeploy the affected spokes' agents too (their `deploy.ps1` copies the password and restarts Alloy).
 
 ## Grafana
 
@@ -91,7 +99,7 @@ Deploy / upgrade:
 
 Grafana-managed rules as code, folder **Alerts**, one rule group per cluster.
 
-**Status: in the repo, not deployed yet.** The last Grafana deploy (2026-10-06, Media-prod) was run from a checkout
+**Status: in the repo, not deployed yet.** The last Grafana deploys (2026-10-06: Media-prod, then the tenant renames to `aauti-hub` / `*-nonprod`) were run from a checkout
 without the alerting / SMTP change, so the live Grafana has no alert rules, contact point or SMTP settings. The next
 `./grafana/deploy.ps1` from `main` deploys them. No rules for Media-prod yet.
 
@@ -113,4 +121,4 @@ without the alerting / SMTP change, so the live Grafana has no alert rules, cont
   password; or `$env:ALERT_EMAILS` / `SMTP_USER` / `SMTP_PASSWORD`); later runs keep the stored values.
   Without recipients the rules still load but nothing is sent.
 - Provisioned rules are read-only in the UI. To add a cluster, copy `media-nonprod.yaml`, change the
-  `cluster` matcher, datasource UIDs, group name and `uid` prefix.
+  `cluster` matcher, group name and `uid` prefix (datasources stay `mimir` / `loki`; every query must filter on `cluster`).
