@@ -40,6 +40,19 @@ tenants:
     metrics:
       retention: 168h        # 7d
       limits: { ingestion_rate: 30000, ingestion_burst_size: 300000, max_global_series_per_user: 150000 }
+  jitsi-prod:
+    title: Jitsi-prod
+    # Spokes: aauti-jitsi-prod-gke (video.aauti.com, environment prod). Own
+    # tenant because prod is kept 30d. Same limits as jitsi-nonprod until there
+    # is real volume to size from.
+    dashboards: [cluster-health, resource-usage, workloads-logs]
+    # Retention policy: prod 30 days, logs and metrics.
+    logs:
+      retention: 720h        # 30d
+      limits: { ingestion_rate_mb: 8, ingestion_burst_size_mb: 16, max_global_streams_per_user: 5000 }
+    metrics:
+      retention: 720h        # 30d
+      limits: { ingestion_rate: 30000, ingestion_burst_size: 300000, max_global_series_per_user: 150000 }
   media-nonprod:
     title: Media-nonprod
     # Spokes: aauti-media-nonprod-as1-gke (dev, qa, demo, sandbox; ~34 app

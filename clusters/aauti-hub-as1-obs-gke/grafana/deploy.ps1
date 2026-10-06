@@ -68,6 +68,8 @@ if ($LASTEXITCODE -ne 0) { throw "creating grafana-hub-datasource failed" }
 $dashDir = Resolve-Path "$PSScriptRoot/../../../charts/observability-stack/dashboards"
 $dashboards = @{
   "jitsi-nonprod" = @{ title = "Jitsi-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("workloads-logs") }   # cluster-health / resource-usage: Jitsi variants in dashboards/tenants/jitsi (+ per-environment rows)
+  # extras: tenant-specific dashboards from dashboards/tenants/<extras> (default: the tenant itself)
+  "jitsi-prod" = @{ title = "Jitsi-prod"; environments = "prod"; shared = @("workloads-logs"); extras = "jitsi-nonprod" }
   "media-nonprod" = @{ title = "Media-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
   "media-prod" = @{ title = "Media-prod"; environments = "prod"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
   "platform-nonprod" = @{ title = "Platform-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
@@ -77,7 +79,8 @@ foreach ($t in $dashboards.Keys) {
   Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
   New-Item -ItemType Directory $tmp | Out-Null
   $files = @($dashboards[$t].shared | ForEach-Object { Get-Item "$dashDir/$_.json" })
-  $files += @(Get-ChildItem "$dashDir/tenants/$t" -Filter *.json -ErrorAction SilentlyContinue)
+  $extras = if ($dashboards[$t].extras) { $dashboards[$t].extras } else { $t }
+  $files += @(Get-ChildItem "$dashDir/tenants/$extras" -Filter *.json -ErrorAction SilentlyContinue)
   foreach ($f in $files) {
     $json = [IO.File]::ReadAllText($f.FullName).
       Replace("__METRICS_DS__", "mimir").Replace("__LOGS_DS__", "loki").
@@ -97,6 +100,15 @@ foreach ($t in $dashboards.Keys) {
   if ($before -and $before -ne $after) { $provisioningChanged = $true }
   Remove-Item -Recurse -Force $tmp
 }
+
+# Explore dashboard (folder Explore): dashboards/*.json as is (already on the
+# "Loki" / "Mimir" datasources, all products).
+$before = kubectl -n $Namespace get configmap grafana-dashboards-explore -o jsonpath="{.metadata.resourceVersion}" 2>$null
+kubectl -n $Namespace create configmap grafana-dashboards-explore --from-file="$PSScriptRoot/dashboards" --dry-run=client -o yaml |
+  kubectl apply --server-side --force-conflicts -f -
+if ($LASTEXITCODE -ne 0) { throw "creating grafana-dashboards-explore failed" }
+$after = kubectl -n $Namespace get configmap grafana-dashboards-explore -o jsonpath="{.metadata.resourceVersion}"
+if ($before -and $before -ne $after) { $provisioningChanged = $true }
 
 # Alert rules: ConfigMap grafana-alerting-rules from alerting/*.yaml.
 $before = kubectl -n $Namespace get configmap grafana-alerting-rules -o jsonpath="{.metadata.resourceVersion}" 2>$null

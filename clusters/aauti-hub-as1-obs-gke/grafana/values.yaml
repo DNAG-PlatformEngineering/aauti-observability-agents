@@ -2,7 +2,7 @@
 # Chart: grafana/grafana 10.5.15. Datasources: "Loki" + "Mimir" across all
 # tenants (Mimir is the default); no per-tenant datasources
 # (aauti-hub, jitsi-nonprod, media-nonprod, media-prod, platform-nonprod). Dashboards: folder per
-# tenant (Jitsi-nonprod, Media-nonprod, Media-prod, Platform-nonprod).
+# tenant (Jitsi-nonprod, Jitsi-prod, Media-nonprod, Media-prod, Platform-nonprod).
 #
 # Exposure: GKE Ingress (external HTTPS LB) + Google-managed certificate on the
 # reserved global static IP "aauti-hub-vpc-as1-grafana-ip" (8.233.134.60).
@@ -152,6 +152,15 @@ dashboardProviders:
         allowUiUpdates: false
         options:
           path: /var/lib/grafana/dashboards/jitsi-nonprod
+      - name: jitsi-prod
+        orgId: 1
+        folder: Jitsi-prod
+        type: file
+        disableDeletion: true
+        editable: false
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/jitsi-prod
       - name: media-nonprod
         orgId: 1
         folder: Media-nonprod
@@ -179,11 +188,24 @@ dashboardProviders:
         allowUiUpdates: false
         options:
           path: /var/lib/grafana/dashboards/platform-nonprod
+      # Cross-product dashboard (grafana/dashboards/*.json): fields Product -> Env
+      # -> Cluster -> Namespace -> App -> Pod -> Container on Loki / Mimir.
+      - name: explore
+        orgId: 1
+        folder: Explore
+        type: file
+        disableDeletion: true
+        editable: false
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/explore
 dashboardsConfigMaps:
   jitsi-nonprod: grafana-dashboards-jitsi-nonprod
+  jitsi-prod: grafana-dashboards-jitsi-prod
   media-nonprod: grafana-dashboards-media-nonprod
   media-prod: grafana-dashboards-media-prod
   platform-nonprod: grafana-dashboards-platform-nonprod
+  explore: grafana-dashboards-explore
 
 # Alerting as code: rule files from alerting/*.yaml (ConfigMap
 # grafana-alerting-rules) plus the email contact point + notification policy

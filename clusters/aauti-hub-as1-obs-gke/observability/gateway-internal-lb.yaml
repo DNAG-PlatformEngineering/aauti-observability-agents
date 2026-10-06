@@ -48,3 +48,6 @@ spec:
     # aauti-media-prod-as1-gke (project aauti-media-prod, VPC aauti-media-prod-vpc)
     - 10.36.0.0/24     # node subnet aauti-media-prod-vpc-as1-gke-subnet
     - 10.37.0.0/17     # pod range
+    # aauti-jitsi-prod-gke (project aauti-jitsi-prod, VPC aauti-jitsi-prod-vpc)
+    - 10.20.0.0/24     # node subnet aauti-jitsi-prod-gke-subnet
+    - 10.21.0.0/17     # pod range

@@ -15,12 +15,14 @@ Secrets (admin passwords, tokens) live only in the cluster, never in this repo.
 | [aauti-media-nonprod-as1-gke](clusters/aauti-media-nonprod-as1-gke/README.md) | `aauti-media-nonprod` | asia-south1-a | Spoke (tenant `media-nonprod`): Alloy agent + kube-state-metrics in `observability-agent-medianonprod`. **Deployed** 2026-10-01, Grafana folder *Media-nonprod*. |
 | [aauti-platform-nonprod-as1-gke](clusters/aauti-platform-nonprod-as1-gke/README.md) | `aauti-platform-noprod` | asia-south1-a | Spoke (tenant `platform-nonprod`): Alloy agent + kube-state-metrics in `observability-agent-platformnonprod`. **Deployed** 2026-10-01, Grafana folder *Platform-nonprod*. |
 | [aauti-media-prod-as1-gke](clusters/aauti-media-prod-as1-gke/README.md) | `aauti-media-prod` | asia-south1 (regional) | Spoke (tenant `media-prod`): Alloy agent + kube-state-metrics in `observability-agent-mediaprod`. **Deployed** 2026-10-06, Grafana folder *Media-prod*. |
+| [aauti-jitsi-prod-gke](clusters/aauti-jitsi-prod-gke/README.md) | `aauti-jitsi-prod` | asia-south1-a | Spoke (tenant `jitsi-prod`): Alloy agent + kube-state-metrics in `observability-agent-jitsiprod`. **Deployed** 2026-10-06, Grafana folder *Jitsi-prod*. |
 
 `network/` holds the VPC peering / internal IP scripts, one per spoke VPC. They are idempotent and support `-WhatIf`
-(media-nonprod's, platform-nonprod's and media-prod's peerings already existed, so their scripts only check them).
+(media-nonprod's, platform-nonprod's and media-prod's peerings already existed, so their scripts only check them;
+jitsi-nonprod's and jitsi-prod's create them).
 
 Retention policy: dev and sandbox 7 days, qa and demo 10 days, prod 30 days. Tenants are per product and tier:
-`<product>-nonprod` (`media-nonprod`, `platform-nonprod`, `jitsi-nonprod`) and `<product>-prod` (`media-prod`), because Mimir
+`<product>-nonprod` (`media-nonprod`, `platform-nonprod`, `jitsi-nonprod`) and `<product>-prod` (`media-prod`, `jitsi-prod`), because Mimir
 has only one metrics retention per tenant. The hub monitors itself as `aauti-hub`. Per-tenant values: [hub README](clusters/aauti-hub-as1-obs-gke/README.md).
 
 **Explore in Grafana:** one `Loki` and one `Mimir` datasource (the default) read all tenants at once. Filter with labels:
@@ -33,6 +35,10 @@ product     media | jitsi | platform | aauti-hub
 e.g. `{product="media", env="qa"} |= "error"` (Loki), `kube_pod_container_status_restarts_total{product="platform", env="dev"}` (Mimir).
 `product` / `env` exist on data sent since 2026-10-06; for older data filter on `cluster` / `environment`. There are no
 per-tenant datasources; the folder dashboards use `Loki` / `Mimir`, each folder limited to its tenant's clusters.
+
+The same as fixed fields: dashboard **Explore** (folder *Explore*, [source](clusters/aauti-hub-as1-obs-gke/grafana/dashboards/explore.json)):
+Product → Env → Cluster → Namespace → App → Pod → Container (+ a search regex), each listing only values under the ones
+before it; panels: log volume, log levels, logs, CPU / memory by pod, restarts, pods not ready, Kubernetes warning events.
 
 ## Charts
 

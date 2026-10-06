@@ -1,0 +1,102 @@
+# Observability agent on aauti-jitsi-prod-gke (namespace "observability-agent-jitsiprod").
+# Chart: ../../../charts/observability-stack (spoke mode), layered on its
+# profiles/spoke.yaml. Ships to the hub aauti-hub-as1-obs-gke, tenant "jitsi-prod".
+#
+# - Scope: every namespace of the cluster (logs + metrics + Kubernetes events).
+# - Labels on every series / log stream: cluster, environment, namespace, pod,
+#   container, node, app, job (+ log_type on logs).
+# - Transport: private only. hubUrl is the hub gateway's INTERNAL load balancer
+#   (10.40.16.10, subnet aauti-hub-vpc-as1-ingest-subnet), reached over the VPC
+#   peering jitsi-prod-to-hub / hub-to-jitsi-prod. Nothing is public.
+# - Security: TLS 1.2+ verified against the hub's private CA (Secret
+#   observability-agent-jitsiprod-hub-ca) with SNI observability-gateway.observability.svc,
+#   plus basic auth as tenant "jitsi-prod" (Secret observability-agent-jitsiprod-auth).
+#   Neither secret is stored in this repo; deploy.ps1 copies them from the hub.
+#
+# Tenant "jitsi-prod" (30d retention) is for Jitsi prod clusters; Jitsi nonprod
+# uses tenant "jitsi-nonprod". Within a tenant, clusters are told apart by the cluster label.
+
+cluster:
+  name: aauti-jitsi-prod-gke
+  tier: prod
+  product: jitsi            # `product` label (single Loki / Mimir datasource in Grafana)
+  # Prod Jitsi (video.aauti.com) serves only prod; room names carry no
+  # environment (e.g. class_<name>-<id>-1), so everything is "prod" and there
+  # is no per-line environment (agent.logs.environmentFromLine stays off).
+  environment: prod
+
+agent:
+  tenant: jitsi-prod
+  # Standard for every cluster: environment from the namespace suffix
+  # (-dev / -qa / -demo / -sandbox / -uat / -staging), else cluster.environment.
+  environmentFromNamespace: { enabled: true }
+  envLabel: { enabled: true }   # also send `environment` as `env`
+  hubUrl: https://10.40.16.10
+  # Every name carries the cluster name, like the release and namespace. The
+  # alloy sub-chart can't template these, so they are repeated under alloy below.
+  configMapName: observability-agent-jitsiprod-config
+  auth:
+    existingSecret: true          # created by deploy.ps1
+    secretName: observability-agent-jitsiprod-auth
+  tls:
+    caSecretName: observability-agent-jitsiprod-hub-ca
+    # CA is passed at install time: --set-file agent.tls.caCert=<hub-ca.crt>
+    serverName: observability-gateway.observability.svc
+  namespaces: []                  # whole cluster
+  metrics:
+    scrapeInterval: 60s
+    annotatedPods: true           # JVB pods (prometheus.io/scrape, port 9888)
+    kubeStateMetrics: { enabled: true }       # this release's own instance
+    nodeExporter:
+      # Re-uses the node-exporter DaemonSet of the existing kube-prometheus-stack
+      # (namespace monitoring). Read-only scrape; nothing there is changed.
+      enabled: true
+      selector: app.kubernetes.io/name=prometheus-node-exporter
+    # Prosody (ServiceMonitor) and Jicofo (PodMonitor) have no scrape
+    # annotations; use the monitors the jitsi-meet chart already ships.
+    # JVB is skipped here because it is already scraped via its annotations.
+    prometheusOperator:
+      enabled: true
+      namespaces: [jitsi]
+      matchExpressions:
+        - { key: app.kubernetes.io/component, operator: NotIn, values: [jvb] }
+  logs:
+    method: api                   # single agent tails every pod via the API
+    events: true
+    defaultLogType: application
+
+# One agent (StatefulSet) on the monitoring node pool. It tails logs through
+# the Kubernetes API, so it does not need to run on every (tainted) node.
+alloy:
+  controller:
+    type: statefulset
+    replicas: 1
+    nodeSelector: { cloud.google.com/gke-nodepool: monitoring }
+    tolerations:
+      - { key: workload, operator: Equal, value: monitoring, effect: NoSchedule }
+    volumes:
+      extra:
+        - name: hub-ca
+          secret: { secretName: observability-agent-jitsiprod-hub-ca, optional: true }   # = agent.tls.caSecretName
+    volumeClaimTemplates:
+      - metadata: { name: alloy-data }
+        spec:
+          accessModes: [ReadWriteOnce]
+          storageClassName: standard-rwo
+          resources: { requests: { storage: 2Gi } }
+  alloy:
+    configMap:
+      create: false
+      name: observability-agent-jitsiprod-config   # = agent.configMapName
+      key: config.alloy
+    extraEnv:
+      - name: HUB_PASSWORD
+        valueFrom: { secretKeyRef: { name: observability-agent-jitsiprod-auth, key: password } }   # = agent.auth.secretName
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 1Gi }
+
+kube-state-metrics:
+  nodeSelector: { cloud.google.com/gke-nodepool: monitoring }
+  tolerations:
+    - { key: workload, operator: Equal, value: monitoring, effect: NoSchedule }
