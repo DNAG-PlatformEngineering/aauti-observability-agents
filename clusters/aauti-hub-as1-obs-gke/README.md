@@ -84,3 +84,26 @@ Deploy / upgrade:
 ```powershell
 ./grafana/deploy.ps1
 ```
+
+## Alerts
+
+Grafana-managed rules as code, folder **Alerts**, one rule group per cluster:
+
+| Group | File | Rules |
+|---|---|---|
+| Media-nonprod | [grafana/alerting/media-nonprod.yaml](grafana/alerting/media-nonprod.yaml) | crash loop, image pull, OOMKilled, frequent restarts, deployment unavailable, pod Pending/Unknown, HPA at max, memory > 90% of limit, PVC > 85%, node NotReady (critical), node pressure, error-log spike, metrics / logs stopped (critical) |
+
+- Notifications go by **email (Outlook)**. `deploy.ps1` loads `grafana/alerting/*.yaml` into ConfigMap
+  `grafana-alerting-rules`, and renders the email contact point `email-nonprod` plus the notification policy
+  (group by alertname, cluster, environment, namespace; repeat 4h) into Secret `grafana-alerting-notify`.
+  Both are mounted into `/etc/grafana/provisioning/alerting`; Grafana restarts when either changes.
+- Sending: `grafana.ini` `smtp` in `grafana/values.yaml` (host `smtp.office365.com:587`, STARTTLS). The sending
+  mailbox and its password live only in Secret `grafana-smtp` (env `GF_SMTP_USER` / `GF_SMTP_PASSWORD` /
+  `GF_SMTP_FROM_ADDRESS`). The mailbox needs **SMTP AUTH enabled in Microsoft 365**; if the tenant blocks it,
+  change `smtp.host` to an SMTP relay on port 587 (GCP blocks outbound port 25).
+- Recipients, mailbox and password are never stored in the repo. Pass them once with
+  `./grafana/deploy.ps1 -AlertEmails "a@aauti.com;b@aauti.com" -SmtpUser alerts@aauti.com` (it prompts for the
+  password; or `$env:ALERT_EMAILS` / `SMTP_USER` / `SMTP_PASSWORD`); later runs keep the stored values.
+  Without recipients the rules still load but nothing is sent.
+- Provisioned rules are read-only in the UI. To add a cluster, copy `media-nonprod.yaml`, change the
+  `cluster` matcher, datasource UIDs, group name and `uid` prefix.

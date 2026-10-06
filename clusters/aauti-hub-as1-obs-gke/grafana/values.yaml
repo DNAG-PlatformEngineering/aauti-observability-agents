@@ -45,6 +45,25 @@ grafana.ini:
   analytics:
     reporting_enabled: false
     check_for_updates: false
+  # Alert emails (Outlook / Microsoft 365). Login and From address come from
+  # Secret grafana-smtp via env (below). Microsoft 365 SMTP AUTH must be
+  # allowed for that mailbox; otherwise point host at an SMTP relay on 587
+  # (GCP blocks outbound port 25).
+  smtp:
+    enabled: true
+    host: smtp.office365.com:587
+    startTLS_policy: MandatoryStartTLS
+    from_name: Aauti Grafana
+
+# SMTP credentials, created by deploy.ps1 (-SmtpUser). optional: Grafana still
+# starts before the Secret exists; it just can't send mail.
+envValueFrom:
+  GF_SMTP_USER:
+    secretKeyRef: { name: grafana-smtp, key: user, optional: true }
+  GF_SMTP_FROM_ADDRESS:
+    secretKeyRef: { name: grafana-smtp, key: user, optional: true }
+  GF_SMTP_PASSWORD:
+    secretKeyRef: { name: grafana-smtp, key: password, optional: true }
 
 # Loki + Mimir of tenant "platform", through the observability gateway (HTTPS,
 # private CA, basic auth). Password and CA come from Secret
@@ -236,6 +255,24 @@ dashboardsConfigMaps:
   jitsi: grafana-dashboards-jitsi
   media: grafana-dashboards-media
   platform-app: grafana-dashboards-platform-app
+
+# Alerting as code: rule files from alerting/*.yaml (ConfigMap
+# grafana-alerting-rules) plus the email contact point + notification policy
+# (Secret grafana-alerting-notify, holds the recipients), both rendered by
+# deploy.ps1 and projected into one provisioning directory. Not the chart's
+# `alerting:` value: that is run through tpl, which breaks {{ .Labels.x }}.
+extraContainerVolumes:
+  - name: alerting
+    projected:
+      sources:
+        - configMap: { name: grafana-alerting-rules }
+        - secret:
+            name: grafana-alerting-notify
+            items: [{ key: notify.yaml, path: notify.yaml }]   # not the raw alert-emails key
+extraVolumeMounts:
+  - name: alerting
+    mountPath: /etc/grafana/provisioning/alerting
+    readOnly: true
 
 sidecar:
   datasources: { enabled: false }

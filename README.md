@@ -15,7 +15,7 @@ Secrets (admin passwords, tokens) live only in the cluster, never in this repo.
 | [aauti-media-nonprod-as1-gke](clusters/aauti-media-nonprod-as1-gke/README.md) | `aauti-media-nonprod` | asia-south1-a | Spoke (tenant `media`): Alloy agent + kube-state-metrics in `observability-agent-medianonprod`. **Deployed** 2026-10-01, Grafana folder *Media-nonprod*. |
 | [aauti-platform-nonprod-as1-gke](clusters/aauti-platform-nonprod-as1-gke/README.md) | `aauti-platform-noprod` | asia-south1-a | Spoke (tenant `platform-app`): Alloy agent + kube-state-metrics in `observability-agent-platformnonprod`. **Deployed** 2026-10-01, Grafana folder *Platform-nonprod*. |
 
-Not onboarded: `aauti-media-nonprod-gke` and `aauti-nonprod-gke` (both us-central1-a, in the same projects as the as1 clusters).
+Out of scope: the US clusters `aauti-media-nonprod-gke` and `aauti-nonprod-gke` (us-central1-a) are not onboarded.
 
 `network/` holds the VPC peering / internal IP scripts, one per spoke VPC. They are idempotent and support `-WhatIf`
 (media-nonprod's and platform-nonprod's peerings already existed, so their scripts only check them).
