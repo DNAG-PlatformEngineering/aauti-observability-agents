@@ -1,6 +1,6 @@
 # Multi-tenancy, limits and retention
 
-> **In this repo** the tenants are `platform` (hub), `jitsi`, `media` and `platform-app` (not
+> **In this repo** the tenants are `platform` (hub), `jitsi`, `media`, `media-prod` and `platform-app` (not
 > `application` / `loadtest`); their limits and retention are in
 > `clusters/aauti-hub-as1-obs-gke/observability/values.yaml`. `alerting` is disabled on the hub and
 > the standalone Grafana doesn't provision the *Tenant usage* dashboard, so the usage alerts and

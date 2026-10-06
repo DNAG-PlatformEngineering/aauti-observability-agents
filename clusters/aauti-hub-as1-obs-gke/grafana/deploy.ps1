@@ -35,7 +35,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Tenants that have datasources in values.yaml (password key per tenant).
-$tenants = @("platform", "jitsi", "media", "platform-app")
+$tenants = @("platform", "jitsi", "media", "media-prod", "platform-app")
 
 # Datasource credentials: copy each tenant password + the gateway CA from the
 # observability namespace (Secrets can't be read across namespaces). Re-running
@@ -65,6 +65,7 @@ $dashDir = Resolve-Path "$PSScriptRoot/../../../charts/observability-stack/dashb
 $dashboards = @{
   jitsi = @{ title = "Jitsi-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("workloads-logs") }   # cluster-health / resource-usage: Jitsi variants in dashboards/tenants/jitsi (+ per-environment rows)
   media = @{ title = "Media-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
+  "media-prod" = @{ title = "Media-prod"; environments = "prod"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
   "platform-app" = @{ title = "Platform-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
 }
 foreach ($t in $dashboards.Keys) {

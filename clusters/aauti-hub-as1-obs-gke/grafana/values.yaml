@@ -1,7 +1,7 @@
 # Standalone Grafana for aauti-hub-as1-obs-gke, served at https://grafana.aauti.ai
 # Chart: grafana/grafana 10.5.15. Datasources: Loki + Mimir per tenant
-# (platform, jitsi, media, platform-app). Dashboards: folder per tenant
-# (Jitsi-nonprod, Media-nonprod, Platform-nonprod).
+# (platform, jitsi, media, media-prod, platform-app). Dashboards: folder per
+# tenant (Jitsi-nonprod, Media-nonprod, Media-prod, Platform-nonprod).
 #
 # Exposure: GKE Ingress (external HTTPS LB) + Google-managed certificate on the
 # reserved global static IP "aauti-hub-vpc-as1-grafana-ip" (8.233.134.60).
@@ -182,6 +182,40 @@ datasources:
           basicAuthPassword: $__file{/etc/grafana/hub/media}
           tlsCACert: $__file{/etc/grafana/hub/ca.crt}
           httpHeaderValue1: media
+      # Tenant "media-prod" (spokes: aauti-media-prod-as1-gke; 30d retention).
+      - name: Loki – Media-prod
+        uid: loki-media-prod
+        type: loki
+        access: proxy
+        url: https://observability-gateway.observability.svc:443
+        basicAuth: true
+        basicAuthUser: media-prod
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          httpHeaderName1: X-Scope-OrgID
+          maxLines: 1000
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/media-prod}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+          httpHeaderValue1: media-prod
+      - name: Mimir – Media-prod
+        uid: mimir-media-prod
+        type: prometheus
+        access: proxy
+        url: https://observability-gateway.observability.svc:443/prometheus
+        basicAuth: true
+        basicAuthUser: media-prod
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          httpHeaderName1: X-Scope-OrgID
+          prometheusType: Mimir
+          timeInterval: 60s
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/media-prod}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+          httpHeaderValue1: media-prod
       # Tenant "platform-app" (spokes: aauti-platform-nonprod-as1-gke).
       - name: Loki – Platform-app
         uid: loki-platform-app
@@ -242,6 +276,15 @@ dashboardProviders:
         allowUiUpdates: false
         options:
           path: /var/lib/grafana/dashboards/media
+      - name: media-prod
+        orgId: 1
+        folder: Media-prod
+        type: file
+        disableDeletion: true
+        editable: false
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/media-prod
       - name: platform-app
         orgId: 1
         folder: Platform-nonprod
@@ -254,6 +297,7 @@ dashboardProviders:
 dashboardsConfigMaps:
   jitsi: grafana-dashboards-jitsi
   media: grafana-dashboards-media
+  media-prod: grafana-dashboards-media-prod
   platform-app: grafana-dashboards-platform-app
 
 # Alerting as code: rule files from alerting/*.yaml (ConfigMap

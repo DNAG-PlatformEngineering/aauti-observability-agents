@@ -45,3 +45,6 @@ spec:
     # aauti-platform-nonprod-as1-gke (project aauti-platform-noprod, VPC aauti-nonprod-vpc)
     - 10.4.0.0/24      # node subnet aauti-nonprod-vpc-as1-gke-subnet
     - 10.5.0.0/17      # pod range
+    # aauti-media-prod-as1-gke (project aauti-media-prod, VPC aauti-media-prod-vpc)
+    - 10.36.0.0/24     # node subnet aauti-media-prod-vpc-as1-gke-subnet
+    - 10.37.0.0/17     # pod range

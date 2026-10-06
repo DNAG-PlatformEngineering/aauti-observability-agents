@@ -10,8 +10,6 @@
 # The peering existed before the observability setup (it is not created by
 # this repo); on the current state every step only prints "ok". Kept so the
 # path is documented and can be recreated the same way as jitsi-nonprod's.
-# The VPC also holds the us-central1 cluster aauti-nonprod-gke, which is
-# out of scope.
 #
 # Idempotent: every step checks first. Needs compute.networkAdmin on both
 # projects to create anything. Usage: ./aauti-platform-nonprod.ps1  [-WhatIf]

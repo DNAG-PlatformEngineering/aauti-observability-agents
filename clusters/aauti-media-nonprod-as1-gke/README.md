@@ -16,8 +16,6 @@ Second **spoke** of the hub observability stack, onboarded like
 | Labels on all data | `cluster=aauti-media-nonprod-as1-gke`, `tier=nonprod`, `environment` (namespace suffix dev/qa/demo/sandbox, else `shared`), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs) |
 | Status | **Deployed** 2026-10-01 (hub, Grafana and agent; all `verify.ps1` checks pass). Grafana folder **Media-nonprod**. |
 
-The other cluster in this project, `aauti-media-nonprod-gke` (us-central1), is out of scope.
-
 ## Differences from jitsi-nonprod
 
 - **Network.** The peering already existed, so [`../../network/aauti-media-nonprod.ps1`](../../network/aauti-media-nonprod.ps1) only checks it

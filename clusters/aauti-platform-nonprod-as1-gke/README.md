@@ -19,8 +19,6 @@ reference setup [aauti-jitsi-nonprod-gke](../aauti-jitsi-nonprod-gke/README.md))
 | Retention | logs: dev, sandbox, shared 7d; qa, demo 10d. Metrics: 10d (one retention per tenant in Mimir) |
 | Status | **Deployed** 2026-10-01 (hub, Grafana and agent). Grafana folder **Platform-nonprod**. |
 
-The other cluster in this project, `aauti-nonprod-gke` (us-central1, also runs ArgoCD), is out of scope.
-
 ## Differences from media-nonprod-as1
 
 - **Tenant name** `platform-app` instead of the product name, because `platform` already exists on the hub.

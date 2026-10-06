@@ -11,7 +11,7 @@ stack on the **hub** cluster and a lightweight collection agent on every
 > - On the hub, the chart's `grafana`, `grafanaAccess` and `alerting` are disabled. Grafana runs
 >   standalone (`clusters/aauti-hub-as1-obs-gke/grafana/`), so there are no tenant teams/orgs, no
 >   *Tenant usage* dashboard and no usage alerts yet.
-> - Tenants are `platform` (hub), `jitsi`, `media` and `platform-app`. Storage is in-cluster MinIO (no GCS yet).
+> - Tenants are `platform` (hub), `jitsi`, `media`, `media-prod` and `platform-app`. Storage is in-cluster MinIO (no GCS yet).
 
 ```
  spoke: media ──┐        HTTPS + basic auth (tenant = user)        ┌──────────── hub ────────────┐

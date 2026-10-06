@@ -116,8 +116,8 @@ For each new cluster:
 0. **Labels.** Every cluster sets `cluster.name`, `cluster.tier` (`prod` / `nonprod`) and
    `cluster.environment`, and enables `agent.environmentFromNamespace`.
    - Namespaces ending in `-dev`, `-qa`, `-demo`, `-sandbox`, `-uat` or `-staging` get that environment. For example, `aauti-api-qa` becomes `environment=qa` on platform-nonprod.
-   - Every other namespace, and the node metrics, get `cluster.environment`. Use the single environment for one-env clusters, and `shared` for multi-env clusters (jitsi-nonprod; media-nonprod-as1: `aauti-media-events`, `media-gateway`; platform-nonprod: `argocd`, `platform-gateway`).
-1. **Tenant.** Use one per product (`jitsi`, `media`, `platform-app`, …), not one per cluster. Prod and nonprod clusters of a product share the tenant and are separated by `environment` and `cluster` labels. Add the tenant to the hub `observability/values.yaml`, plus a datasource pair and dashboard provider in `grafana/values.yaml` and `deploy.ps1`.
+   - Every other namespace, and the node metrics, get `cluster.environment`. Use the single environment for one-env clusters (media-prod-as1: `prod`; `-prod` is not a namespace suffix, so it falls through to this), and `shared` for multi-env clusters (jitsi-nonprod; media-nonprod-as1: `aauti-media-events`, `media-gateway`; platform-nonprod: `argocd`, `platform-gateway`).
+1. **Tenant.** Use one per product (`jitsi`, `media`, `platform-app`, …) for nonprod and `<product>-prod` for prod (e.g. `media-prod`), not one per cluster. Prod is separate because it's kept 30d (dev/sandbox 7d, qa/demo 10d) and Mimir has only one metrics retention per tenant. Clusters within a tenant are separated by `environment` and `cluster` labels. Add the tenant to the hub `observability/values.yaml`, plus a datasource pair and dashboard provider in `grafana/values.yaml` and `deploy.ps1`.
 2. **Network.**
    - Hub side: copy `network/aauti-jitsi-nonprod.ps1` and change the spoke project, VPC and peering names. Media and platform VPCs are already peered with the hub; for those, the script only checks the peering (see `network/aauti-media-nonprod.ps1`).
    - Spoke side: check the spoke's ranges don't overlap the hub or any VPC already peered with it.
@@ -128,10 +128,12 @@ For each new cluster:
    - In `values.yaml`, change `cluster.name`, `cluster.environment` and `agent.tenant`, plus the node pool and tolerations.
      Don't use a pool tainted `components.gke.io/gke-managed-components` (reserved for GKE).
    - In `verify.ps1`, change the contexts, peering names, node / pod ranges and the expected `environment`.
-   - Namespace **and** Helm release = `observability-agent-<cluster without -gke and dashes>` (e.g. `observability-agent-jitsinonprod`; `aauti-media-nonprod-as1-gke` uses `observability-agent-medianonprod`, the only media nonprod cluster with an agent). Set `$Namespace` / `$Release` in `deploy.ps1` and `verify.ps1`, and `agent.configMapName`, `agent.auth.secretName`, `agent.tls.caSecretName` plus the matching `alloy` entries in `values.yaml`, to that prefix.
+   - Namespace **and** Helm release = `observability-agent-<cluster without -gke and dashes>` (e.g. `observability-agent-jitsinonprod`; `aauti-media-nonprod-as1-gke` uses `observability-agent-medianonprod`, the only media nonprod cluster with an agent; `aauti-media-prod-as1-gke` uses `observability-agent-mediaprod`). Set `$Namespace` / `$Release` in `deploy.ps1` and `verify.ps1`, and `agent.configMapName`, `agent.auth.secretName`, `agent.tls.caSecretName` plus the matching `alloy` entries in `values.yaml`, to that prefix.
    - Keep `hubUrl` / `serverName` as they are.
    - Enable `prometheusOperator` only if the app ships ServiceMonitors.
    - If the cluster has no node-exporter, set `agent.metrics.nodeExporter.enabled=false` or install one.
    - For very high log volume, switch to `alloy.controller.type: daemonset` with `logs.method: file` (example: `D:\k6s\observability-stack\environments\prod-example\spoke-media.yaml`).
 4. **Roll out** in the same order: network → hub → Grafana → agent → `verify.ps1`.
+   On a cluster whose pods are older than 7 days, the agent's first minutes replay old pod logs that Loki rejects
+   (HTTP 400 "timestamp too old"); the gateway status check fails until those leave its 10-minute window (media-prod: ~12 minutes after install).
 5. **Docs.** Add the cluster to the tables in the root `README.md` and the hub README.

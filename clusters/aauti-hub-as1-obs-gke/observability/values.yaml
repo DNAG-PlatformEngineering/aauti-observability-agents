@@ -17,8 +17,10 @@ agent:
   tenant: platform          # hub self-monitoring
   namespaces: []            # whole hub cluster
 
-# One tenant per product; its clusters are told apart by the cluster /
-# environment labels the agents attach (see ../../aauti-jitsi-nonprod-gke).
+# One tenant per product, plus <product>-prod for its prod clusters (prod is
+# kept 30d; Mimir has one metrics retention per tenant). Clusters within a
+# tenant are told apart by the cluster / environment labels the agents attach
+# (see ../../aauti-jitsi-nonprod-gke).
 tenants:
   jitsi:
     title: Jitsi
@@ -51,6 +53,20 @@ tenants:
       limits: { ingestion_rate_mb: 8, ingestion_burst_size_mb: 16, max_global_streams_per_user: 5000 }
     metrics:
       retention: 240h        # 10d
+      limits: { ingestion_rate: 30000, ingestion_burst_size: 300000, max_global_series_per_user: 150000 }
+  media-prod:
+    title: Media-prod
+    # Spokes: aauti-media-prod-as1-gke (environment prod). Own tenant, not
+    # "media", because Mimir has one metrics retention per tenant and prod
+    # needs 30d while media nonprod keeps 7d / 10d. Same limits as media until
+    # there is real volume to size from.
+    dashboards: [cluster-health, resource-usage, workloads-logs]
+    # Retention policy: prod 30 days, logs and metrics.
+    logs:
+      retention: 720h        # 30d
+      limits: { ingestion_rate_mb: 8, ingestion_burst_size_mb: 16, max_global_streams_per_user: 5000 }
+    metrics:
+      retention: 720h        # 30d
       limits: { ingestion_rate: 30000, ingestion_burst_size: 300000, max_global_series_per_user: 150000 }
   platform-app:
     title: Platform-app

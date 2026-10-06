@@ -14,11 +14,14 @@ Secrets (admin passwords, tokens) live only in the cluster, never in this repo.
 | [aauti-jitsi-nonprod-gke](clusters/aauti-jitsi-nonprod-gke/README.md) | `aauti-jitsi-noprod` | asia-south1-a | Spoke (tenant `jitsi`): Alloy agent + kube-state-metrics in `observability-agent-jitsinonprod`. **Deployed** 2026-09-30, Grafana folder *Jitsi-nonprod*. The README also defines the standard for onboarding the other clusters. |
 | [aauti-media-nonprod-as1-gke](clusters/aauti-media-nonprod-as1-gke/README.md) | `aauti-media-nonprod` | asia-south1-a | Spoke (tenant `media`): Alloy agent + kube-state-metrics in `observability-agent-medianonprod`. **Deployed** 2026-10-01, Grafana folder *Media-nonprod*. |
 | [aauti-platform-nonprod-as1-gke](clusters/aauti-platform-nonprod-as1-gke/README.md) | `aauti-platform-noprod` | asia-south1-a | Spoke (tenant `platform-app`): Alloy agent + kube-state-metrics in `observability-agent-platformnonprod`. **Deployed** 2026-10-01, Grafana folder *Platform-nonprod*. |
-
-Out of scope: the US clusters `aauti-media-nonprod-gke` and `aauti-nonprod-gke` (us-central1-a) are not onboarded.
+| [aauti-media-prod-as1-gke](clusters/aauti-media-prod-as1-gke/README.md) | `aauti-media-prod` | asia-south1 (regional) | Spoke (tenant `media-prod`): Alloy agent + kube-state-metrics in `observability-agent-mediaprod`. **Deployed** 2026-10-06, Grafana folder *Media-prod*. |
 
 `network/` holds the VPC peering / internal IP scripts, one per spoke VPC. They are idempotent and support `-WhatIf`
-(media-nonprod's and platform-nonprod's peerings already existed, so their scripts only check them).
+(media-nonprod's, platform-nonprod's and media-prod's peerings already existed, so their scripts only check them).
+
+Retention policy: dev and sandbox 7 days, qa and demo 10 days, prod 30 days. Nonprod clusters share one tenant per product
+(`media`, `platform-app`, `jitsi`), prod clusters get `<product>-prod` (`media-prod`), because Mimir has only one metrics
+retention per tenant. Per-tenant values: [hub README](clusters/aauti-hub-as1-obs-gke/README.md).
 
 ## Charts
 

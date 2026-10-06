@@ -26,6 +26,7 @@
   | `platform` | this cluster | `observability` | — | deployed |
   | `jitsi` | [aauti-jitsi-nonprod-gke](../aauti-jitsi-nonprod-gke/README.md) (asia-south1-a) | `observability-agent-jitsinonprod` | Jitsi-nonprod | deployed |
   | `media` | [aauti-media-nonprod-as1-gke](../aauti-media-nonprod-as1-gke/README.md) (asia-south1-a) | `observability-agent-medianonprod` | Media-nonprod | deployed |
+  | `media-prod` | [aauti-media-prod-as1-gke](../aauti-media-prod-as1-gke/README.md) (asia-south1, regional) | `observability-agent-mediaprod` | Media-prod | deployed |
   | `platform-app` | [aauti-platform-nonprod-as1-gke](../aauti-platform-nonprod-as1-gke/README.md) (asia-south1-a) | `observability-agent-platformnonprod` | Platform-nonprod | deployed |
 - **Retention** (`observability/values.yaml`, per tenant):
 
@@ -33,19 +34,20 @@
   |---|---|---|
   | `jitsi` | 7d, all environments | 7d |
   | `media` | dev, sandbox, shared 7d; qa, demo 10d (`streamRetention` on `environment`) | 10d (Mimir has one retention per tenant, so qa/demo's 10d applies to all) |
-  | `platform-app` | same as `media` | 10d |
+  | `media-prod` | 30d | 30d (own tenant because of this; prod policy) |
+  | `platform-app` | dev, sandbox, shared 7d; qa, demo 10d | 10d |
   | `platform` | 14d | 30d |
 
 - **Spoke ingest (private):** `observability-gateway-internal` ([gateway-internal-lb.yaml](observability/gateway-internal-lb.yaml))
   is an internal LB on 10.40.16.10 (ingest subnet) reached over VPC peering. It's source-ranged to each spoke's node and pod CIDRs
   (jitsi-nonprod 10.16.0.0/24 + 10.17.0.0/17, media-nonprod-as1 10.32.0.0/24 + 10.33.0.0/17,
-  platform-nonprod-as1 10.4.0.0/24 + 10.5.0.0/17). Global access is off, so only
+  platform-nonprod-as1 10.4.0.0/24 + 10.5.0.0/17, media-prod-as1 10.36.0.0/24 + 10.37.0.0/17). Global access is off, so only
   spokes in asia-south1 can reach it; a spoke in another region needs the annotation
   `networking.gke.io/internal-load-balancer-allow-global-access: "true"`.
   Spokes verify TLS with SNI `observability-gateway.observability.svc`, a SAN of the existing gateway certificate.
 - **Alloy + kube-state-metrics** collect this whole cluster into tenant `platform`.
 - **Grafana datasources:** `Loki – Jitsi` / `Mimir – Jitsi` (user `jitsi`, folder *Jitsi-nonprod*) and `Loki – Media` / `Mimir – Media`
-  (user `media`, folder *Media-nonprod*) and `Loki – Platform-app` / `Mimir – Platform-app` (user `platform-app`,
+  (user `media`, folder *Media-nonprod*), `Loki – Media-prod` / `Mimir – Media-prod` (user `media-prod`, folder *Media-prod*) and `Loki – Platform-app` / `Mimir – Platform-app` (user `platform-app`,
   folder *Platform-nonprod*) work the same way as the platform pair below. Each pair can only read its own tenant.
   `Loki – Platform` and `Mimir – Platform` (the default) connect over HTTPS to
   `observability-gateway.observability.svc` and verify the gateway CA. They use basic auth `platform` and send `X-Scope-OrgID: platform`.
@@ -87,7 +89,12 @@ Deploy / upgrade:
 
 ## Alerts
 
-Grafana-managed rules as code, folder **Alerts**, one rule group per cluster:
+Grafana-managed rules as code, folder **Alerts**, one rule group per cluster.
+
+**Status: in the repo, not deployed yet.** The last Grafana deploy (2026-10-06, Media-prod) was run from a checkout
+without the alerting / SMTP change, so the live Grafana has no alert rules, contact point or SMTP settings. The next
+`./grafana/deploy.ps1` from `main` deploys them. No rules for Media-prod yet.
+
 
 | Group | File | Rules |
 |---|---|---|
