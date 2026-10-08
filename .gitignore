@@ -5,3 +5,4 @@
 *.key
 *.crt
 kubeconfig*
+.claude/settings.local.json

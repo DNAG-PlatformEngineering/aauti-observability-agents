@@ -16,7 +16,7 @@ Platform **prod spoke** of the hub observability stack, onboarded like
 | Agent namespace / Helm release | `observability-agent-platformprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-platform-prod-as1-gke`, `tier=prod`, `product=platform`, `environment=prod` (single-environment cluster, so every namespace and the nodes), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). `env` = same value as `environment` |
 | Retention | logs and metrics 30d (tenant `platform-prod`) |
-| Status | **In the repo, not deployed yet.** No alert rules. |
+| Status | **Deployed** 2026-10-08 (verify.ps1: everything passes except the gateway status-code check, whose 400s were the one-time first-start backfill of log lines older than 7 days, rejected by Loki). No alert rules. |
 
 ## Differences from media-prod
 

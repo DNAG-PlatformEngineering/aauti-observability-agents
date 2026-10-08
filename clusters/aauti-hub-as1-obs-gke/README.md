@@ -29,7 +29,7 @@
   | `media-prod` | [aauti-media-prod-as1-gke](../aauti-media-prod-as1-gke/README.md) (asia-south1, regional) | `observability-agent-mediaprod` | Media-prod | deployed |
   | `jitsi-prod` | [aauti-jitsi-prod-gke](../aauti-jitsi-prod-gke/README.md) (asia-south1-a) | `observability-agent-jitsiprod` | Jitsi-prod | deployed |
   | `platform-nonprod` | [aauti-platform-nonprod-as1-gke](../aauti-platform-nonprod-as1-gke/README.md) (asia-south1-a) | `observability-agent-platformnonprod` | Platform-nonprod | deployed |
-  | `platform-prod` | [aauti-platform-prod-as1-gke](../aauti-platform-prod-as1-gke/README.md) (asia-south1, regional) | `observability-agent-platformprod` | Platform-prod | in the repo, not deployed yet |
+  | `platform-prod` | [aauti-platform-prod-as1-gke](../aauti-platform-prod-as1-gke/README.md) (asia-south1, regional) | `observability-agent-platformprod` | Platform-prod | deployed |
 - **Retention** (`observability/values.yaml`, per tenant):
 
   | Tenant | Logs (Loki) | Metrics (Mimir) |
@@ -107,9 +107,8 @@ Deploy / upgrade:
 
 Grafana-managed rules as code, folder **Alerts**, one rule group per cluster.
 
-**Status: in the repo, not deployed yet.** The last Grafana deploys (2026-10-06: Media-prod, then the tenant renames to `aauti-hub` / `*-nonprod`) were run from a checkout
-without the alerting / SMTP change, so the live Grafana has no alert rules, contact point or SMTP settings. The next
-`./grafana/deploy.ps1` from `main` deploys them. No rules for Media-prod yet.
+**Status: deployed 2026-10-08, without recipients.** The rules are loaded, but no `-AlertEmails` were passed, so
+notifications go nowhere until `./grafana/deploy.ps1 -AlertEmails ... -SmtpUser ...` is run once. No rules for the prod clusters yet.
 
 
 | Group | File | Rules |
