@@ -5,7 +5,7 @@
 # Prerequisites, in order (see ../README.md):
 #   1. ../../../network/aauti-jitsi-nonprod.ps1        (IP + peering)
 #   2. ../../aauti-hub-as1-obs-gke/observability/deploy.ps1  (tenant jitsi-nonprod + internal LB)
-#   3. ../../aauti-hub-as1-obs-gke/grafana/deploy.ps1        (datasources + dashboards)
+#   3. ../../aauti-hub-as1-obs-gke/grafana/deploy.ps1        (dashboard folder)
 #
 # Only creates new objects in the new namespace observability-agent-jitsinonprod (plus the
 # agent's ClusterRole/Binding for read access). Existing workloads, the

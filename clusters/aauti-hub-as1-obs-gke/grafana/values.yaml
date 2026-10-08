@@ -16,6 +16,14 @@ admin:
   userKey: admin-user
   passwordKey: admin-password
 
+# The PVC is ReadWriteOnce: stop the old pod before starting the new one
+# (a rolling update can't attach the disk twice, or would run two Grafanas on one DB).
+deploymentStrategy:
+  type: Recreate
+# Switching an existing Deployment from RollingUpdate needed a one-time
+# `kubectl patch` removing spec.strategy.rollingUpdate (2026-10-08): helm 4's
+# server-side apply can't drop those API-defaulted fields itself.
+
 persistence:
   enabled: true
   type: pvc
@@ -67,9 +75,9 @@ envValueFrom:
   GF_SMTP_PASSWORD:
     secretKeyRef: { name: grafana-smtp, key: password, optional: true }
 
-# Loki + Mimir of tenant "aauti-hub" (hub self-monitoring), through the observability gateway (HTTPS,
-# private CA, basic auth). Password and CA come from Secret
-# grafana-hub-datasource, copied from namespace "observability" by deploy.ps1.
+# Federated Loki + Mimir (all tenants), through the observability gateway (HTTPS,
+# private CA, basic auth as read-only user grafana-reader). Password and CA come
+# from Secret grafana-hub-datasource, copied from namespace "observability" by deploy.ps1.
 extraSecretMounts:
   - name: hub-datasource
     secretName: grafana-hub-datasource

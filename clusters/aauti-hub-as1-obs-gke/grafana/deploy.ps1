@@ -19,6 +19,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 gcloud container clusters get-credentials $Cluster --zone $Zone --project $Project
+if ($LASTEXITCODE -ne 0) { throw "get-credentials for $Cluster failed (VPN / gcloud login?)" }
 $ctx = kubectl config current-context
 Write-Host "Using context $ctx"
 
@@ -67,7 +68,7 @@ if ($LASTEXITCODE -ne 0) { throw "creating grafana-hub-datasource failed" }
 # (no ".+" all-value), so every panel stays within the folder's tenant.
 $dashDir = Resolve-Path "$PSScriptRoot/../../../charts/observability-stack/dashboards"
 $dashboards = @{
-  "jitsi-nonprod" = @{ title = "Jitsi-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("workloads-logs") }   # cluster-health / resource-usage: Jitsi variants in dashboards/tenants/jitsi (+ per-environment rows)
+  "jitsi-nonprod" = @{ title = "Jitsi-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("workloads-logs") }   # cluster-health / resource-usage: Jitsi variants in dashboards/tenants/jitsi-nonprod (+ per-environment rows)
   # extras: tenant-specific dashboards from dashboards/tenants/<extras> (default: the tenant itself)
   "jitsi-prod" = @{ title = "Jitsi-prod"; environments = "prod"; shared = @("workloads-logs"); extras = "jitsi-nonprod" }
   "media-nonprod" = @{ title = "Media-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
@@ -199,7 +200,9 @@ if ($LASTEXITCODE -ne 0) { throw "helm install failed" }
 # dashboards / alert rules / contact points take effect immediately.
 if ($provisioningChanged) {
   kubectl -n $Namespace rollout restart deploy/grafana
+  if ($LASTEXITCODE -ne 0) { throw "restarting grafana failed" }
   kubectl -n $Namespace rollout status deploy/grafana --timeout 5m
+  if ($LASTEXITCODE -ne 0) { throw "grafana rollout did not finish within 5m" }
 }
 
 Write-Host ""

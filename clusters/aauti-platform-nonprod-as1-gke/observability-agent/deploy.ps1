@@ -6,7 +6,7 @@
 # Prerequisites, in order (see ../README.md):
 #   1. VPC peering platform-nonprod-to-hub / hub-to-platform-nonprod (already ACTIVE)
 #   2. ../../aauti-hub-as1-obs-gke/observability/deploy.ps1  (tenant platform-nonprod + internal LB)
-#   3. ../../aauti-hub-as1-obs-gke/grafana/deploy.ps1        (datasources + dashboards)
+#   3. ../../aauti-hub-as1-obs-gke/grafana/deploy.ps1        (dashboard folder)
 #
 # Only creates new objects in the new namespace observability-agent-platformnonprod
 # (plus the agent's ClusterRole/Binding for read access). Existing workloads

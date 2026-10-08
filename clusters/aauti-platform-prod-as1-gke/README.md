@@ -12,7 +12,7 @@ Platform **prod spoke** of the hub observability stack, onboarded like
 | VPC | `aauti-prod-vpc`: nodes 10.12.0.0/24, pods 10.13.0.0/17, services 10.14.0.0/22 (subnet `aauti-prod-vpc-as1-gke-subnet`) |
 | Peering | `platform-prod-to-hub` ⇄ `hub-to-platform-prod` (already existed, ACTIVE) |
 | Hub | `aauti-hub-as1-obs-gke`, tenant **`platform-prod`**, Grafana https://grafana.aauti.ai (folder **Platform-prod**) |
-| Workloads | `aauti-{ai,api,chat,discovery,marketplace,notification,scheduler,studio,whiteboard-api,whiteboard-ui,worker}`, `pgbouncer`, `platform-gateway-prod` (~76 pods incl. system; 14 pods have `prometheus.io/scrape` annotations) |
+| Workloads | `aauti-{ai,api,chat,discovery,marketplace,notification,scheduler,studio,whiteboard-api,whiteboard-ui,worker}`, `pgbouncer`, `platform-gateway-prod` (~76 pods incl. system). 14 pods have `prometheus.io/scrape` annotations, all GKE system pods in `kube-system` (cilium, kube-dns, node-local-dns); no app pod yet |
 | Agent namespace / Helm release | `observability-agent-platformprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-platform-prod-as1-gke`, `tier=prod`, `product=platform`, `environment=prod` (single-environment cluster, so every namespace and the nodes), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). `env` = same value as `environment` |
 | Retention | logs and metrics 30d (tenant `platform-prod`) |
@@ -51,14 +51,14 @@ cd D:\aauti-observability-agents
 ./clusters/aauti-hub-as1-obs-gke/observability/deploy.ps1
 
 # 2. Hub Grafana: Platform-prod dashboards (Grafana pod restarts once).
-#    Note: grafana/deploy.ps1 on main also deploys the email alerting + SMTP (see the hub README, Alerts).
+#    It also deploys the email alerting + SMTP (live since 2026-10-08; see the hub README, Alerts).
 ./clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1
 
 # 3. Spoke: agent in the new namespace observability-agent-platformprod.
 gcloud container clusters get-credentials aauti-platform-prod-as1-gke --region asia-south1 --project aauti-platform-prod
 ./clusters/aauti-platform-prod-as1-gke/observability-agent/deploy.ps1
 
-# 4. Verify (read-only), after ~2 minutes.
+# 4. Verify (read-only), ~10-12 minutes after step 3 (first-start "timestamp too old" 400s must leave the window).
 ./clusters/aauti-platform-prod-as1-gke/observability-agent/verify.ps1
 ```
 

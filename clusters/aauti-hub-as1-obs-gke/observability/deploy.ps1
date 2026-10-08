@@ -11,6 +11,7 @@ $ErrorActionPreference = "Stop"
 $chart = Resolve-Path "$PSScriptRoot/../../../charts/observability-stack"
 
 gcloud container clusters get-credentials $Cluster --zone $Zone --project $Project
+if ($LASTEXITCODE -ne 0) { throw "get-credentials for $Cluster failed (VPN / gcloud login?)" }
 $ctx = kubectl config current-context
 Write-Host "Using context $ctx"
 
@@ -27,7 +28,9 @@ if ($LASTEXITCODE -ne 0) { throw "applying gateway-internal-lb.yaml failed" }
 # The hub agent reads its tenant password only at start-up (tenant rename,
 # password rotation), like the spokes.
 kubectl --context $ctx -n $Namespace rollout restart statefulset/observability-alloy
+if ($LASTEXITCODE -ne 0) { throw "restarting observability-alloy failed" }
 kubectl --context $ctx -n $Namespace rollout status statefulset/observability-alloy --timeout 5m
+if ($LASTEXITCODE -ne 0) { throw "observability-alloy rollout did not finish within 5m" }
 
 kubectl --context $ctx -n $Namespace get pods
 kubectl --context $ctx -n $Namespace get svc observability-gateway-internal

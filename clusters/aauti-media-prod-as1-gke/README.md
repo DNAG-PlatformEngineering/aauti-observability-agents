@@ -16,7 +16,7 @@ First **prod spoke** of the hub observability stack, onboarded like
 | Agent namespace / Helm release | `observability-agent-mediaprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-media-prod-as1-gke`, `tier=prod`, `product=media`, `environment=prod` (single-environment cluster, so every namespace and the nodes), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). `env` = same value as `environment` (since 2026-10-06) |
 | Retention | logs and metrics 30d (tenant `media-prod`) |
-| Status | **Deployed** 2026-10-06 (hub, Grafana and agent; all `verify.ps1` checks pass). Grafana folder **Media-prod**. No alert rules yet. On first start the agent replays pod logs from before Loki's 7-day reject window; Loki rejects those (HTTP 400 "timestamp too old") for ~2 minutes, after which `verify.ps1` passes. |
+| Status | **Deployed** 2026-10-06 (hub, Grafana and agent; all `verify.ps1` checks pass). Grafana folder **Media-prod**. No alert rules yet. On first start the agent replays pod logs from before Loki's 7-day reject window; Loki rejects those (HTTP 400 "timestamp too old") for ~2 minutes; `verify.ps1` passes once they leave its 10-minute window (~12 minutes after install). |
 
 ## Differences from media-nonprod
 
@@ -52,15 +52,14 @@ cd D:\aauti-observability-agents
 # 1. Hub: tenant "media-prod" + LB source ranges. The gateway pod restarts once.
 ./clusters/aauti-hub-as1-obs-gke/observability/deploy.ps1
 
-# 2. Hub Grafana: Media-prod datasources + dashboards (Grafana pod restarts once).
-#    Note: grafana/deploy.ps1 on main also deploys the email alerting + SMTP (see the hub README, Alerts).
-#    On 2026-10-06 this step ran from a checkout of fb95d9b + the Media-prod change, so alerting is not live yet.
+# 2. Hub Grafana: Media-prod dashboards (Grafana pod restarts once).
+#    It also deploys the email alerting + SMTP (live since 2026-10-08; see the hub README, Alerts).
 ./clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1
 
 # 3. Spoke: agent in the new namespace observability-agent-mediaprod.
 ./clusters/aauti-media-prod-as1-gke/observability-agent/deploy.ps1
 
-# 4. Verify (read-only), after ~2 minutes.
+# 4. Verify (read-only), ~10-12 minutes after step 3 (first-start "timestamp too old" 400s must leave the window).
 ./clusters/aauti-media-prod-as1-gke/observability-agent/verify.ps1
 ```
 

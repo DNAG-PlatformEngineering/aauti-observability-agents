@@ -2,10 +2,12 @@
 
 > **In this repo** section 1 applies as written. Sections 2–3 describe the chart's bundled Grafana,
 > which is disabled on the hub. The standalone Grafana (`clusters/aauti-hub-as1-obs-gke/grafana/`)
-> reads tenant passwords and the CA from Secret `grafana-hub-datasource`, mounted at
-> `/etc/grafana/hub/<tenant>` and `/etc/grafana/hub/ca.crt`; its admin login is Secret
-> `grafana-admin` in namespace `grafana`. `grafanaAccess` is off, so there are no tenant
-> teams/orgs: any Editor can query every tenant's datasource.
+> has one `Loki` and one `Mimir` datasource that log in as the read-only federated user
+> `grafana-reader` (`gateway.reader`): the gateway sets its `X-Scope-OrgID` to every tenant and
+> returns 403 on pushes. Its password and the CA come from Secret `grafana-hub-datasource`; the
+> admin login is Secret `grafana-admin` in namespace `grafana`. `grafanaAccess` is off, so there
+> are no tenant teams/orgs: any Viewer can read every tenant. The tenant binding below applies to
+> every user except `grafana-reader`.
 
 ## 1. Spoke → hub: TLS + per-tenant basic auth
 

@@ -24,7 +24,8 @@ All seven clusters are in asia-south1.
 (media-nonprod's, platform-nonprod's, media-prod's and platform-prod's peerings already existed, so their scripts only check them;
 jitsi-nonprod's and jitsi-prod's create them).
 
-Retention policy: dev and sandbox 7 days, qa and demo 10 days, prod 30 days. Tenants are per product and tier:
+Retention policy: dev and sandbox 7 days, qa and demo 10 days, prod 30 days (exception: `jitsi-nonprod` keeps every
+environment, qa and demo included, 7 days). Tenants are per product and tier:
 `<product>-nonprod` (`media-nonprod`, `platform-nonprod`, `jitsi-nonprod`) and `<product>-prod` (`media-prod`, `jitsi-prod`, `platform-prod`), because Mimir
 has only one metrics retention per tenant. The hub monitors itself as `aauti-hub`. Per-tenant values: [hub README](clusters/aauti-hub-as1-obs-gke/README.md).
 
@@ -51,7 +52,7 @@ set them with `grafana/deploy.ps1 -AlertEmails ...`. Setup and recipients: [hub 
 
 `charts/observability-stack` is a copy of the POC chart (`D:\k6s\observability-stack`)
 with its sub-charts vendored. Changes, all opt-in (defaults render as before):
-- `scheduling`: nodeSelector / tolerations for the gateway and the MinIO bucket Job.
+- `scheduling`: nodeSelector / tolerations for the gateway, the MinIO bucket Job, k6 CronJobs and the grafana-access Job.
 - `agent.tls.serverName`: TLS SNI when `hubUrl` is the internal LB IP.
 - `agent.metrics.prometheusOperator`: scrape existing ServiceMonitors / PodMonitors.
 - `agent.logs.environmentFromLine`: environment taken from the log line (Jitsi room names).
@@ -61,3 +62,4 @@ with its sub-charts vendored. Changes, all opt-in (defaults render as before):
 - `cluster.product`: `product` label on all data; `agent.envLabel`: `env` alias of the final `environment`.
 - `gateway.reader`: a read-only gateway user pinned to all tenants (Loki / Mimir tenant federation) for Grafana's
   single `Loki` / `Mimir` datasources; push returns 403 for it.
+- Tenant-usage alert summaries escape `$labels` / `$values` as `$$` (Grafana interpolates env vars in provisioned files).

@@ -250,7 +250,7 @@ gateway:
     limits: { memory: 128Mi }
 
 # -- nodeSelector / tolerations for the chart's own workloads (gateway,
-# MinIO bucket Job). Sub-charts take their own settings.
+# MinIO bucket Job, k6 CronJobs, grafana-access Job). Sub-charts take their own settings.
 scheduling:
   nodeSelector: {}
   tolerations: []

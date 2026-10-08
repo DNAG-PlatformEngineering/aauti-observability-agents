@@ -6,7 +6,7 @@
 # Prerequisites, in order (see ../README.md):
 #   1. VPC peering media-prod-to-hub / hub-to-media-prod (already ACTIVE)
 #   2. ../../aauti-hub-as1-obs-gke/observability/deploy.ps1  (tenant media-prod + internal LB)
-#   3. ../../aauti-hub-as1-obs-gke/grafana/deploy.ps1        (datasources + dashboards)
+#   3. ../../aauti-hub-as1-obs-gke/grafana/deploy.ps1        (dashboard folder)
 #
 # Only creates new objects in the new namespace observability-agent-mediaprod
 # (plus the agent's ClusterRole/Binding for read access). Existing workloads

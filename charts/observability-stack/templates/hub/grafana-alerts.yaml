@@ -34,7 +34,7 @@ data:
                 "ds" $ds "pending" $p
                 "expr" (printf "(sum by (user) (cortex_ingester_active_series) / %v) / on (user) max by (user) (cortex_limits_overrides{limit_name=\"max_global_series_per_user\"})" $rf)
                 "op" "gt" "value" $thr
-                "summary" "Tenant {{ $labels.user }} uses {{ humanizePercentage $values.A.Value }} of its series limit"
+                "summary" "Tenant {{ $$labels.user }} uses {{ humanizePercentage $$values.A.Value }} of its series limit"
                 "description" "Raise tenants.<id>.metrics.limits.max_global_series_per_user or reduce cardinality at the spoke.") | nindent 10 }}
           {{- include "obs.alertRule" (dict
                 "uid" "mimir-tenant-ingestion-near-limit"
@@ -42,7 +42,7 @@ data:
                 "ds" $ds "pending" $p
                 "expr" "sum by (user) (rate(cortex_distributor_received_samples_total[5m])) / on (user) max by (user) (cortex_limits_overrides{limit_name=\"ingestion_rate\"})"
                 "op" "gt" "value" $thr
-                "summary" "Tenant {{ $labels.user }} ingests at {{ humanizePercentage $values.A.Value }} of its samples/s limit"
+                "summary" "Tenant {{ $$labels.user }} ingests at {{ humanizePercentage $$values.A.Value }} of its samples/s limit"
                 "description" "Samples above the limit are rejected (HTTP 429) for this tenant only.") | nindent 10 }}
           {{- include "obs.alertRule" (dict
                 "uid" "mimir-tenant-samples-discarded"
@@ -50,7 +50,7 @@ data:
                 "ds" $ds "pending" $p
                 "expr" "sum by (user, reason) (rate(cortex_discarded_samples_total[5m]))"
                 "op" "gt" "value" 0 "for" "5m"
-                "summary" "Tenant {{ $labels.user }} is losing samples ({{ $labels.reason }})"
+                "summary" "Tenant {{ $$labels.user }} is losing samples ({{ $$labels.reason }})"
                 "description" "Mimir is rejecting data for this tenant; see the Tenant Usage dashboard.") | nindent 10 }}
           {{- include "obs.alertRule" (dict
                 "uid" "loki-tenant-ingestion-near-limit"
@@ -58,7 +58,7 @@ data:
                 "ds" $ds "pending" $p
                 "expr" (printf "sum by (tenant) (rate(loki_distributor_bytes_received_total[5m])) / on (tenant) (%s)" (join " or " $lokiLimit))
                 "op" "gt" "value" $thr
-                "summary" "Tenant {{ $labels.tenant }} sends logs at {{ humanizePercentage $values.A.Value }} of its MB/s limit"
+                "summary" "Tenant {{ $$labels.tenant }} sends logs at {{ humanizePercentage $$values.A.Value }} of its MB/s limit"
                 "description" "Raise tenants.<id>.logs.limits.ingestion_rate_mb or drop noisy streams at the spoke.") | nindent 10 }}
           {{- include "obs.alertRule" (dict
                 "uid" "loki-tenant-logs-discarded"
@@ -66,7 +66,7 @@ data:
                 "ds" $ds "pending" $p
                 "expr" "sum by (tenant, reason) (rate(loki_discarded_bytes_total[5m]))"
                 "op" "gt" "value" 0 "for" "5m"
-                "summary" "Tenant {{ $labels.tenant }} is losing logs ({{ $labels.reason }})"
+                "summary" "Tenant {{ $$labels.tenant }} is losing logs ({{ $$labels.reason }})"
                 "description" "Loki is rejecting log lines for this tenant; see the Tenant Usage dashboard.") | nindent 10 }}
           {{- include "obs.alertRule" (dict
                 "uid" "tenant-metrics-stopped"
@@ -74,7 +74,7 @@ data:
                 "ds" $ds "pending" $p
                 "expr" (printf "sum by (user) (rate(cortex_distributor_received_samples_total{user!~\"%s\"}[10m]))" $quiet)
                 "op" "lt" "value" 0.01 "severity" "critical"
-                "summary" "No metrics received from tenant {{ $labels.user }} for 10m"
+                "summary" "No metrics received from tenant {{ $$labels.user }} for 10m"
                 "description" "The spoke agent is down or cannot reach the hub gateway (credentials, TLS, network).") | nindent 10 }}
           {{- include "obs.alertRule" (dict
                 "uid" "tenant-logs-stopped"
@@ -82,7 +82,7 @@ data:
                 "ds" $ds "pending" $p
                 "expr" (printf "sum by (tenant) (rate(loki_distributor_lines_received_total{tenant!~\"%s\"}[10m]))" $quiet)
                 "op" "lt" "value" 0.01 "severity" "critical"
-                "summary" "No logs received from tenant {{ $labels.tenant }} for 10m"
+                "summary" "No logs received from tenant {{ $$labels.tenant }} for 10m"
                 "description" "The spoke agent is down or cannot reach the hub gateway (credentials, TLS, network).") | nindent 10 }}
     {{- $cps := .Values.alerting.contactPoints | default list }}
     {{- with .Values.alerting.webhook.url }}

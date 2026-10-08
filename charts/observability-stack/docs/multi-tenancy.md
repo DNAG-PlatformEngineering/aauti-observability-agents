@@ -5,7 +5,9 @@
 > `clusters/aauti-hub-as1-obs-gke/observability/values.yaml`. `alerting` is disabled on the hub and
 > the standalone Grafana doesn't provision the *Tenant usage* dashboard, so the usage alerts and
 > dashboard described below aren't active. `scripts/verify-tenancy.ps1` is POC-only; each spoke's
-> `verify.ps1` checks its own tenant.
+> `verify.ps1` checks its own tenant. Exception to the tenant binding below: with
+> `gateway.reader.enabled` (on in this repo) the read-only user `grafana-reader` gets
+> `X-Scope-OrgID` set to all tenants (`a|b|…`) and 403 on pushes.
 
 ## Model
 

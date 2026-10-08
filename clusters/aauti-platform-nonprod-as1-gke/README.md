@@ -17,7 +17,7 @@ reference setup [aauti-jitsi-nonprod-gke](../aauti-jitsi-nonprod-gke/README.md))
 | Agent namespace / Helm release | `observability-agent-platformnonprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-platform-nonprod-as1-gke`, `tier=nonprod`, `product=platform`, `environment` (namespace suffix dev/qa/demo/sandbox, else `shared`), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). `env` = same value as `environment` (since 2026-10-06) |
 | Retention | logs: dev, sandbox, shared 7d; qa, demo 10d. Metrics: 10d (one retention per tenant in Mimir) |
-| Status | **Deployed** 2026-10-01 (hub, Grafana and agent). Grafana folder **Platform-nonprod**. |
+| Status | **Deployed** 2026-10-01 (hub, Grafana and agent). Grafana folder **Platform-nonprod**. No alert rules yet. |
 
 ## Differences from media-nonprod-as1
 
@@ -48,13 +48,13 @@ cd D:\aauti-observability-agents
 # 1. Hub: tenant "platform-nonprod" + LB source ranges.
 ./clusters/aauti-hub-as1-obs-gke/observability/deploy.ps1
 
-# 2. Hub Grafana: Platform-nonprod datasources + dashboards (Grafana pod restarts once).
+# 2. Hub Grafana: Platform-nonprod dashboards (Grafana pod restarts once).
 ./clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1
 
 # 3. Spoke: agent in the new namespace observability-agent-platformnonprod.
 ./clusters/aauti-platform-nonprod-as1-gke/observability-agent/deploy.ps1
 
-# 4. Verify (read-only), after ~2 minutes.
+# 4. Verify (read-only), ~10-12 minutes after step 3 (first-start "timestamp too old" 400s must leave the window).
 ./clusters/aauti-platform-nonprod-as1-gke/observability-agent/verify.ps1
 ```
 

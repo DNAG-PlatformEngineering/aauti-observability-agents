@@ -14,7 +14,7 @@
 #   Neither secret is stored in this repo; deploy.ps1 copies them from the hub.
 #
 # Tenant "jitsi-nonprod" is shared by all Jitsi nonprod clusters; they are told apart by the
-# cluster / environment labels (prod will use environment: prod).
+# cluster / environment labels. Jitsi prod uses its own tenant, jitsi-prod.
 
 cluster:
   name: aauti-jitsi-nonprod-gke

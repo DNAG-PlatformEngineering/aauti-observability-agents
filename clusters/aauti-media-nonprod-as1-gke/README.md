@@ -14,13 +14,13 @@ Second **spoke** of the hub observability stack, onboarded like
 | Workloads | `aauti-media-{api,dashboard,delivery,upload}-{dev,qa,demo,sandbox}`, `aauti-media-events`, `media-gateway` |
 | Agent namespace / Helm release | `observability-agent-medianonprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-media-nonprod-as1-gke`, `tier=nonprod`, `product=media`, `environment` (namespace suffix dev/qa/demo/sandbox, else `shared`), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). `env` = same value as `environment` (since 2026-10-06) |
-| Status | **Deployed** 2026-10-01 (hub, Grafana and agent; all `verify.ps1` checks pass). Grafana folder **Media-nonprod**. |
+| Status | **Deployed** 2026-10-01 (hub, Grafana and agent; all `verify.ps1` checks pass). Grafana folder **Media-nonprod**. Alert rules ([media-nonprod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/media-nonprod.yaml)) deployed 2026-10-08, but no recipients are set yet, so nothing is sent. |
 
 ## Differences from jitsi-nonprod
 
 - **Network.** The peering already existed, so [`../../network/aauti-media-nonprod.ps1`](../../network/aauti-media-nonprod.ps1) only checks it
   (it would recreate it if missing). Only the LB source ranges were added.
-- **No node-exporter or Prometheus Operator** on this cluster, and no app pod has scrape annotations yet.
+- **No node-exporter or Prometheus Operator** on this cluster, and no app pod has scrape annotations yet (only GKE's own `kube-system` pods do).
   Node metrics come from kubelet/cAdvisor only; annotated pods are picked up automatically later.
 - **Node pool.** The agent and kube-state-metrics run on `apps` (toleration `workload=apps`), because `system` is reserved for GKE.
   Together they request ~120m CPU / 340Mi memory.
@@ -44,13 +44,13 @@ cd D:\aauti-observability-agents
 # 1. Hub: tenant "media-nonprod" + LB source ranges. The gateway pod restarts once.
 ./clusters/aauti-hub-as1-obs-gke/observability/deploy.ps1
 
-# 2. Hub Grafana: Media datasources + dashboards (Grafana pod restarts once).
+# 2. Hub Grafana: Media dashboards (Grafana pod restarts once).
 ./clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1
 
 # 3. Spoke: agent in the new namespace observability-agent-medianonprod.
 ./clusters/aauti-media-nonprod-as1-gke/observability-agent/deploy.ps1
 
-# 4. Verify (read-only), after ~2 minutes.
+# 4. Verify (read-only), ~10-12 minutes after step 3 (first-start "timestamp too old" 400s must leave the window).
 ./clusters/aauti-media-nonprod-as1-gke/observability-agent/verify.ps1
 ```
 

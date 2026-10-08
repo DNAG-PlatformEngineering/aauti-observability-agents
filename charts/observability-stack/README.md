@@ -12,7 +12,10 @@ stack on the **hub** cluster and a lightweight collection agent on every
 >   standalone (`clusters/aauti-hub-as1-obs-gke/grafana/`), so there are no tenant teams/orgs, no
 >   *Tenant usage* dashboard and no usage alerts yet.
 > - Tenants are `aauti-hub` (hub self-monitoring; the chart default `platform` is removed), `jitsi-nonprod`, `jitsi-prod`, `media-nonprod`, `media-prod`, `platform-nonprod` and `platform-prod`. Storage is in-cluster MinIO (no GCS yet).
-> - Added options: `cluster.product`, `agent.envLabel` and `gateway.reader` (read-only federated user); see `values.yaml`.
+> - The standalone Grafana has one federated `Loki` / `Mimir` datasource pair (user `grafana-reader`), not the
+>   per-tenant datasources in the diagram and the table below.
+> - Added options: `cluster.product`, `agent.envLabel`, `gateway.reader` (read-only federated user) and
+>   `scheduling` (gateway, bucket Job, k6, grafana-access); see `values.yaml` and the root `README.md`.
 
 ```
  spoke: media ──┐        HTTPS + basic auth (tenant = user)        ┌──────────── hub ────────────┐

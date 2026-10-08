@@ -9,8 +9,8 @@ clusters are onboarded the same way (see [Standard](#standard-for-the-next-clust
 | Location | asia-south1-a (zonal) |
 | VPC | `aauti-jitsi-nonprod-vpc`: nodes 10.16.0.0/24, pods 10.17.0.0/17, services 10.18.0.0/22 |
 | Hub | `aauti-hub-as1-obs-gke`, tenant **`jitsi-nonprod`** (was `jitsi` until 2026-10-06), Grafana https://grafana.aauti.ai (folder **Jitsi-nonprod**) |
-| Labels on all data | `cluster=aauti-jitsi-nonprod-gke`, `tier=nonprod`, `product=jitsi`, `environment`, `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). **environment:** one Jitsi (`devvideo.aauti.com`) serves **dev, qa, demo and sandbox**, chosen per meeting by the room name (`<title>-<id>-aauti-<env>`, recordings `…-recording-<env>`). Infrastructure (pods, nodes, JVB load, all metrics) = `shared`. Log lines naming a room (web, prosody, jicofo, jvb, jibri `[finalize][<env>]`) = that meeting's env.. `env` = same value as `environment` (since 2026-10-06) |
-| Status | **Deployed** 2026-09-30. Grafana folder **Jitsi-nonprod**. |
+| Labels on all data | `cluster=aauti-jitsi-nonprod-gke`, `tier=nonprod`, `product=jitsi`, `environment`, `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). **environment:** one Jitsi (`devvideo.aauti.com`) serves **dev, qa, demo and sandbox**, chosen per meeting by the room name (`<title>-<id>-aauti-<env>`, recordings `…-recording-<env>`). Infrastructure (pods, nodes, JVB load, all metrics) = `shared`. Log lines naming a room (web, prosody, jicofo, jvb, jibri `[finalize][<env>]`) = that meeting's env. `env` = same value as `environment` (since 2026-10-06) |
+| Status | **Deployed** 2026-09-30. Grafana folder **Jitsi-nonprod**. No alert rules yet. |
 | Agent namespace / Helm release | `observability-agent-jitsinonprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. Renamed from `observability-agent` on 2026-10-01. |
 
 ## What gets deployed
@@ -41,10 +41,10 @@ Jitsi release are **not modified**. The agent only *reads*:
 
 | Requirement | How |
 |---|---|
-| Private only | The agent's only destination is `https://10.40.16.10` (RFC 1918). That IP belongs to an **internal** passthrough LB in the hub VPC, reachable only over the peering `jitsi-nonprod-to-hub` ⇄ `hub-to-jitsi-nonprod`. There's no public IP, public DNS or internet path. The LB's firewall rule (created by GKE) only allows `10.16.0.0/24` and `10.17.0.0/17`. |
+| Private only | The agent's only destination is `https://10.40.16.10` (RFC 1918). That IP belongs to an **internal** passthrough LB in the hub VPC, reachable only over the peering `jitsi-nonprod-to-hub` ⇄ `hub-to-jitsi-nonprod`. There's no public IP, public DNS or internet path. The LB's firewall rule (created by GKE) only allows the peered spokes' node and pod ranges listed in `gateway-internal-lb.yaml` (this cluster: `10.16.0.0/24`, `10.17.0.0/17`). |
 | TLS | Gateway listens only on TLS (8443 → LB 443, TLSv1.2/1.3). The agent verifies the certificate against the hub's private CA (`ca_file`) with `server_name = observability-gateway.observability.svc`. `insecure_skip_verify` is off. |
 | Authentication | Basic auth per tenant (`jitsi-nonprod`, bcrypt htpasswd on the gateway). The gateway derives `X-Scope-OrgID` from the user and returns 403 on a mismatch, so this cluster can only write or read tenant `jitsi-nonprod`. The password lives only in Secrets: hub `observability-tenant-credentials`, spoke `observability-agent-jitsinonprod-auth`. |
-| Least privilege | Agent RBAC is read-only (get/list/watch; pods/log; nodes/metrics). Grafana's Jitsi datasources authenticate as `jitsi-nonprod` and can't read any other tenant. |
+| Least privilege | Agent RBAC is read-only (get/list/watch; pods/log; nodes/metrics). The agent's credential can only write tenant `jitsi-nonprod`. Grafana reads through the federated read-only user `grafana-reader` (all tenants, pushes get 403). |
 
 ## Files
 
@@ -53,7 +53,7 @@ Jitsi release are **not modified**. The agent only *reads*:
 | [`../../network/aauti-jitsi-nonprod.ps1`](../../network/aauti-jitsi-nonprod.ps1) | both VPCs | reserves 10.40.16.10, creates both peerings (idempotent, supports `-WhatIf`) |
 | [`../aauti-hub-as1-obs-gke/observability/values.yaml`](../aauti-hub-as1-obs-gke/observability/values.yaml) | hub | adds tenant `jitsi-nonprod` (limits; retention 7d logs + metrics, all environments) |
 | [`../aauti-hub-as1-obs-gke/observability/gateway-internal-lb.yaml`](../aauti-hub-as1-obs-gke/observability/gateway-internal-lb.yaml) | hub | new internal LB Service (existing ClusterIP Service untouched) |
-| [`../aauti-hub-as1-obs-gke/grafana/values.yaml`](../aauti-hub-as1-obs-gke/grafana/values.yaml) + `deploy.ps1` | hub | Jitsi datasources and dashboard folder |
+| [`../aauti-hub-as1-obs-gke/grafana/values.yaml`](../aauti-hub-as1-obs-gke/grafana/values.yaml) + `deploy.ps1` | hub | Jitsi dashboard folder |
 | [`observability-agent/values.yaml`](observability-agent/values.yaml) | this cluster | agent Helm values |
 | [`observability-agent/deploy.ps1`](observability-agent/deploy.ps1) | this cluster | copies credentials and CA from the hub, runs `helm upgrade --install` |
 | [`observability-agent/verify.ps1`](observability-agent/verify.ps1) | both (read-only) | checks the private path, TLS, auth, and data in Grafana |
@@ -71,13 +71,13 @@ cd D:\aauti-observability-agents
 # 2. Hub: tenant "jitsi-nonprod" + internal LB. The gateway pod restarts once (config change).
 ./clusters/aauti-hub-as1-obs-gke/observability/deploy.ps1
 
-# 3. Hub Grafana: Jitsi datasources + dashboards (Grafana pod restarts once).
+# 3. Hub Grafana: Jitsi dashboards (Grafana pod restarts once).
 ./clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1
 
 # 4. Spoke: agent in the new namespace observability-agent-jitsinonprod.
 ./clusters/aauti-jitsi-nonprod-gke/observability-agent/deploy.ps1
 
-# 5. Verify (read-only), after ~2 minutes.
+# 5. Verify (read-only), ~10-12 minutes after step 4 (first-start "timestamp too old" 400s must leave the window).
 ./clusters/aauti-jitsi-nonprod-gke/observability-agent/verify.ps1
 ```
 
@@ -85,11 +85,11 @@ cd D:\aauti-observability-agents
 ```powershell
 helm --kube-context gke_aauti-jitsi-noprod_asia-south1-a_aauti-jitsi-nonprod-gke -n observability-agent-jitsinonprod uninstall observability-agent-jitsinonprod
 kubectl --context gke_aauti-jitsi-noprod_asia-south1-a_aauti-jitsi-nonprod-gke delete namespace observability-agent-jitsinonprod
-kubectl --context gke_aauti-hub_asia-south1-a_aauti-hub-as1-obs-gke -n observability delete svc observability-gateway-internal
 gcloud compute networks peerings delete jitsi-nonprod-to-hub --network aauti-jitsi-nonprod-vpc --project aauti-jitsi-noprod
 gcloud compute networks peerings delete hub-to-jitsi-nonprod --network aauti-hub-vpc --project aauti-hub
 ```
-Then remove `jitsi-nonprod` from the hub values and redeploy observability and Grafana.
+Then remove `jitsi-nonprod` from the hub values, its two ranges from `gateway-internal-lb.yaml` and Grafana, and
+redeploy observability and Grafana. Don't delete the internal LB `observability-gateway-internal`: every spoke sends through it.
 
 ## Dashboards (Grafana → folder **Jitsi-nonprod**)
 
@@ -136,5 +136,5 @@ For each new cluster:
    - For very high log volume, switch to `alloy.controller.type: daemonset` with `logs.method: file` (example: `D:\k6s\observability-stack\environments\prod-example\spoke-media.yaml`).
 4. **Roll out** in the same order: network → hub → Grafana → agent → `verify.ps1`.
    On a cluster whose pods are older than 7 days, the agent's first minutes replay old pod logs that Loki rejects
-   (HTTP 400 "timestamp too old"); the gateway status check fails until those leave its 10-minute window (media-prod: ~12 minutes after install).
+   (HTTP 400 "timestamp too old"); the gateway status check fails until those leave its 10-minute window, so run `verify.ps1` ~10-12 minutes after the agent install.
 5. **Docs.** Add the cluster to the tables in the root `README.md` and the hub README.

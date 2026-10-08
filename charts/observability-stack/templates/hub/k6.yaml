@@ -47,6 +47,12 @@ spec:
             k6.observability.aauti.com/test: {{ $name }}
         spec:
           restartPolicy: Never
+          {{- with $.Values.scheduling.nodeSelector }}
+          nodeSelector: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.scheduling.tolerations }}
+          tolerations: {{- toYaml . | nindent 12 }}
+          {{- end }}
           securityContext:
             runAsNonRoot: true
             runAsUser: 12345

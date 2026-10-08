@@ -65,7 +65,8 @@
   those clusters only), and every panel filters on `$cluster`, so a folder never shows another tenant's data.
   The datasources connect over HTTPS to `observability-gateway.observability.svc` and verify the gateway CA.
   `grafana/deploy.ps1` copies the `grafana-reader` password and the CA into Secret `grafana-hub-datasource`, so run it again after rotating either.
-- Every pod runs on node pool `observability`. The chart copy adds `scheduling` for its own gateway and bucket Job.
+- Every pod runs on node pool `observability`. The chart copy adds `scheduling` for its own gateway, bucket Job,
+  k6 CronJobs and grafana-access Job.
 - Tenant passwords are in Secret `observability-tenant-credentials`, and the gateway CA is in `observability-hub-ca`.
 
 Deploy / upgrade:
@@ -86,7 +87,8 @@ tenant, redeploy the affected spokes' agents too (their `deploy.ps1` copies the 
   Google-managed certificate (`grafana-cert`); HTTP redirects to HTTPS.
 - DNS: Cloudflare A record `grafana.aauti.ai` → 8.233.134.60.
 - Runs on node pool `observability` (taint `workload=observability:NoSchedule`),
-  10Gi PVC on `standard-rwo`.
+  10Gi PVC on `standard-rwo`. The PVC is ReadWriteOnce, so the Deployment uses `strategy: Recreate` (since 2026-10-08):
+  every Grafana restart or upgrade has a ~30-60s gap (alerts aren't evaluated during it).
 - Chart is vendored as `grafana/grafana-10.5.15.tgz` because github.com is not
   reachable over the office VPN.
 - The control plane only accepts the office IP (183.82.114.188), so deploy from
@@ -103,6 +105,9 @@ Deploy / upgrade:
 ./grafana/deploy.ps1
 ```
 
+Both hub scripts stop with an error if `get-credentials` fails (VPN / gcloud login) or a rollout doesn't finish
+within 5 minutes, instead of carrying on against whatever kube context was current.
+
 ## Alerts
 
 Grafana-managed rules as code, folder **Alerts**, one rule group per cluster.
@@ -117,7 +122,7 @@ notifications go nowhere until `./grafana/deploy.ps1 -AlertEmails ... -SmtpUser 
 
 - Notifications go by **email (Outlook)**. `deploy.ps1` loads `grafana/alerting/*.yaml` into ConfigMap
   `grafana-alerting-rules`, and renders the email contact point `email-nonprod` plus the notification policy
-  (group by alertname, cluster, environment, namespace; repeat 4h) into Secret `grafana-alerting-notify`.
+  (group by grafana_folder, alertname, cluster, environment, namespace; repeat 4h) into Secret `grafana-alerting-notify`.
   Both are mounted into `/etc/grafana/provisioning/alerting`; Grafana restarts when either changes.
 - Sending: `grafana.ini` `smtp` in `grafana/values.yaml` (host `smtp.office365.com:587`, STARTTLS). The sending
   mailbox and its password live only in Secret `grafana-smtp` (env `GF_SMTP_USER` / `GF_SMTP_PASSWORD` /

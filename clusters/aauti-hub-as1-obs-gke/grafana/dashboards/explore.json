@@ -548,7 +548,7 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "sum by (cluster, namespace, pod) (kube_pod_status_ready{product=~\"$product\", env=~\"$env\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\", condition=\"false\"}) > 0",
+          "expr": "sum by (cluster, namespace, pod) (kube_pod_status_ready{product=~\"$product\", env=~\"$env\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\", condition=\"false\"}) > 0",
           "refId": "A",
           "format": "table",
           "instant": true

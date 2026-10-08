@@ -50,7 +50,8 @@ agent:
     kubeStateMetrics: { enabled: true }       # this release's own instance
     # The cluster has no node-exporter (no kube-prometheus-stack); node CPU /
     # memory come from kubelet + cAdvisor instead. No app pod has
-    # prometheus.io/scrape annotations yet; annotatedPods picks them up later.
+    # prometheus.io/scrape annotations yet (only GKE's cilium, kube-dns and
+    # node-local-dns pods); annotatedPods picks app pods up once annotated.
     nodeExporter: { enabled: false }
     # No monitoring.coreos.com CRDs on this cluster.
     prometheusOperator: { enabled: false }

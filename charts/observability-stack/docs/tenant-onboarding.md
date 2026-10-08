@@ -2,8 +2,9 @@
 
 > **In this repo** follow *Standard for the next clusters* in
 > `clusters/aauti-jitsi-nonprod-gke/README.md` instead: it uses the per-cluster `deploy.ps1` /
-> `verify.ps1`, the internal LB `gateway-internal-lb.yaml`, and adds the datasources and dashboard
-> folder to the standalone Grafana. `scripts/onboard-spoke.ps1` and `environments/` are POC-only.
+> `verify.ps1`, the internal LB `gateway-internal-lb.yaml`, and adds a dashboard folder to the
+> standalone Grafana. There are no per-tenant datasources: the hub upgrade adds the new tenant to
+> `grafana-reader`, so the shared `Loki` / `Mimir` datasources read it automatically. `scripts/onboard-spoke.ps1` and `environments/` are POC-only.
 
 Example: a new **Payments** cluster. Tenant id `payments`, cluster name
 `payments-prod`.

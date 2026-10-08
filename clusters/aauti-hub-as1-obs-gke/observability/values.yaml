@@ -4,7 +4,8 @@
 #
 # - Object storage: in-cluster MinIO (no GCS buckets yet).
 # - Grafana is NOT part of this release; it runs standalone in namespace
-#   "grafana" (../grafana), with a Loki + Mimir datasource pair per tenant.
+#   "grafana" (../grafana), with one federated Loki + Mimir datasource pair
+#   (read-only user grafana-reader, gateway.reader below).
 # - Loki + Mimir are reachable only through the authenticating gateway:
 #   ClusterIP for Grafana in-cluster, plus the internal LB 10.40.16.10 for
 #   spokes over VPC peering (gateway-internal-lb.yaml). Nothing is public.
