@@ -16,13 +16,16 @@ Secrets (admin passwords, tokens) live only in the cluster, never in this repo.
 | [aauti-platform-nonprod-as1-gke](clusters/aauti-platform-nonprod-as1-gke/README.md) | `aauti-platform-noprod` | asia-south1-a | Spoke (tenant `platform-nonprod`): Alloy agent + kube-state-metrics in `observability-agent-platformnonprod`. **Deployed** 2026-10-01, Grafana folder *Platform-nonprod*. |
 | [aauti-media-prod-as1-gke](clusters/aauti-media-prod-as1-gke/README.md) | `aauti-media-prod` | asia-south1 (regional) | Spoke (tenant `media-prod`): Alloy agent + kube-state-metrics in `observability-agent-mediaprod`. **Deployed** 2026-10-06, Grafana folder *Media-prod*. |
 | [aauti-jitsi-prod-gke](clusters/aauti-jitsi-prod-gke/README.md) | `aauti-jitsi-prod` | asia-south1-a | Spoke (tenant `jitsi-prod`): Alloy agent + kube-state-metrics in `observability-agent-jitsiprod`. **Deployed** 2026-10-06, Grafana folder *Jitsi-prod*. |
+| [aauti-platform-prod-as1-gke](clusters/aauti-platform-prod-as1-gke/README.md) | `aauti-platform-prod` | asia-south1 (regional) | Spoke (tenant `platform-prod`): Alloy agent + kube-state-metrics in `observability-agent-platformprod`. **In the repo, not deployed yet**; Grafana folder *Platform-prod*. |
+
+All seven clusters are in asia-south1. The us-central1 clusters are out of scope and won't be onboarded.
 
 `network/` holds the VPC peering / internal IP scripts, one per spoke VPC. They are idempotent and support `-WhatIf`
-(media-nonprod's, platform-nonprod's and media-prod's peerings already existed, so their scripts only check them;
+(media-nonprod's, platform-nonprod's, media-prod's and platform-prod's peerings already existed, so their scripts only check them;
 jitsi-nonprod's and jitsi-prod's create them).
 
 Retention policy: dev and sandbox 7 days, qa and demo 10 days, prod 30 days. Tenants are per product and tier:
-`<product>-nonprod` (`media-nonprod`, `platform-nonprod`, `jitsi-nonprod`) and `<product>-prod` (`media-prod`, `jitsi-prod`), because Mimir
+`<product>-nonprod` (`media-nonprod`, `platform-nonprod`, `jitsi-nonprod`) and `<product>-prod` (`media-prod`, `jitsi-prod`, `platform-prod`), because Mimir
 has only one metrics retention per tenant. The hub monitors itself as `aauti-hub`. Per-tenant values: [hub README](clusters/aauti-hub-as1-obs-gke/README.md).
 
 **Explore in Grafana:** one `Loki` and one `Mimir` datasource (the default) read all tenants at once. Filter with labels:
@@ -39,6 +42,10 @@ per-tenant datasources; the folder dashboards use `Loki` / `Mimir`, each folder 
 The same as fixed fields: dashboard **Explore** (folder *Explore*, [source](clusters/aauti-hub-as1-obs-gke/grafana/dashboards/explore.json)):
 Product → Env → Cluster → Namespace → App → Pod → Container (+ a search regex), each listing only values under the ones
 before it; panels: log volume, log levels, logs, CPU / memory by pod, restarts, pods not ready, Kubernetes warning events.
+
+**Alerts:** Grafana-managed rules as code in [`grafana/alerting/`](clusters/aauti-hub-as1-obs-gke/grafana/alerting/),
+one file per cluster, sent by email (Outlook SMTP). Only Media-nonprod has rules so far, and they're **not deployed yet**;
+the next `grafana/deploy.ps1` from `main` deploys them. Setup and recipients: [hub README → Alerts](clusters/aauti-hub-as1-obs-gke/README.md#alerts).
 
 ## Charts
 

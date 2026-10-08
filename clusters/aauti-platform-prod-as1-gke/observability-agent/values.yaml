@@ -1,0 +1,100 @@
+# Observability agent on aauti-platform-prod-as1-gke (namespace
+# "observability-agent-platformprod"). Chart: ../../../charts/observability-stack
+# (spoke mode), layered on its profiles/spoke.yaml. Ships to the hub
+# aauti-hub-as1-obs-gke, tenant "platform-prod".
+#
+# - Scope: every namespace of the cluster (logs + metrics + Kubernetes events).
+# - Labels on every series / log stream: cluster, environment, namespace, pod,
+#   container, node, app, job (+ log_type on logs).
+# - Transport: private only. hubUrl is the hub gateway's INTERNAL load balancer
+#   (10.40.16.10, same region asia-south1 as this regional cluster), reached
+#   over the existing VPC peering platform-prod-to-hub / hub-to-platform-prod.
+# - Security: TLS 1.2+ verified against the hub's private CA (Secret
+#   observability-agent-platformprod-hub-ca) with SNI observability-gateway.observability.svc,
+#   plus basic auth as tenant "platform-prod" (Secret observability-agent-platformprod-auth).
+#   Neither secret is stored in this repo; deploy.ps1 copies them from the hub.
+#
+# Tenant "platform-prod" (30d retention) is for Platform prod clusters; platform
+# nonprod uses tenant "platform-nonprod". Within a tenant, clusters are told apart by the cluster label.
+
+cluster:
+  name: aauti-platform-prod-as1-gke
+  tier: prod
+  product: platform            # `product` label (single Loki / Mimir datasource in Grafana)
+  # Single-environment cluster: every namespace (aauti-<app>, pgbouncer,
+  # platform-gateway-prod, kube-system) and the nodes are "prod". "-prod" is not
+  # one of the environmentFromNamespace suffixes, so it falls through to this value.
+  environment: prod
+
+agent:
+  tenant: platform-prod
+  # Standard for every cluster: environment from the namespace suffix
+  # (-dev / -qa / -demo / -sandbox / -uat / -staging), else cluster.environment.
+  environmentFromNamespace: { enabled: true }
+  envLabel: { enabled: true }   # also send `environment` as `env`
+  hubUrl: https://10.40.16.10
+  # Every name carries the cluster name, like the release and namespace. The
+  # alloy sub-chart can't template these, so they are repeated under alloy below.
+  configMapName: observability-agent-platformprod-config
+  auth:
+    existingSecret: true          # created by deploy.ps1
+    secretName: observability-agent-platformprod-auth
+  tls:
+    caSecretName: observability-agent-platformprod-hub-ca
+    # CA is passed at install time: --set-file agent.tls.caCert=<hub-ca.crt>
+    serverName: observability-gateway.observability.svc
+  namespaces: []                  # whole cluster
+  metrics:
+    scrapeInterval: 60s
+    annotatedPods: true
+    kubeStateMetrics: { enabled: true }       # this release's own instance
+    # The cluster has no node-exporter (no kube-prometheus-stack); node CPU /
+    # memory come from kubelet + cAdvisor instead. No app pod has
+    # prometheus.io/scrape annotations yet; annotatedPods picks them up later.
+    nodeExporter: { enabled: false }
+    # No monitoring.coreos.com CRDs on this cluster.
+    prometheusOperator: { enabled: false }
+  logs:
+    method: api                   # single agent tails every pod via the API
+    events: true
+    defaultLogType: application
+
+# One agent (StatefulSet) on the "apps" node pool: the "system" pool is
+# reserved for GKE's own components (taint components.gke.io/gke-managed-components).
+# It tails logs through the Kubernetes API, so it does not need to run on every
+# node. Switch to a DaemonSet with logs.method=file once log volume is high.
+# Regional cluster: the 2Gi standard-rwo PVC is zonal, so the pod stays in the
+# zone it was first scheduled in (every zone has an "apps" node, min 1 each).
+alloy:
+  controller:
+    type: statefulset
+    replicas: 1
+    nodeSelector: { cloud.google.com/gke-nodepool: apps }
+    tolerations:
+      - { key: workload, operator: Equal, value: apps, effect: NoSchedule }
+    volumes:
+      extra:
+        - name: hub-ca
+          secret: { secretName: observability-agent-platformprod-hub-ca, optional: true }   # = agent.tls.caSecretName
+    volumeClaimTemplates:
+      - metadata: { name: alloy-data }
+        spec:
+          accessModes: [ReadWriteOnce]
+          storageClassName: standard-rwo
+          resources: { requests: { storage: 2Gi } }
+  alloy:
+    configMap:
+      create: false
+      name: observability-agent-platformprod-config   # = agent.configMapName
+      key: config.alloy
+    extraEnv:
+      - name: HUB_PASSWORD
+        valueFrom: { secretKeyRef: { name: observability-agent-platformprod-auth, key: password } }   # = agent.auth.secretName
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 1Gi }
+
+kube-state-metrics:
+  nodeSelector: { cloud.google.com/gke-nodepool: apps }
+  tolerations:
+    - { key: workload, operator: Equal, value: apps, effect: NoSchedule }

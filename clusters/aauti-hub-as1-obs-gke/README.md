@@ -29,6 +29,7 @@
   | `media-prod` | [aauti-media-prod-as1-gke](../aauti-media-prod-as1-gke/README.md) (asia-south1, regional) | `observability-agent-mediaprod` | Media-prod | deployed |
   | `jitsi-prod` | [aauti-jitsi-prod-gke](../aauti-jitsi-prod-gke/README.md) (asia-south1-a) | `observability-agent-jitsiprod` | Jitsi-prod | deployed |
   | `platform-nonprod` | [aauti-platform-nonprod-as1-gke](../aauti-platform-nonprod-as1-gke/README.md) (asia-south1-a) | `observability-agent-platformnonprod` | Platform-nonprod | deployed |
+  | `platform-prod` | [aauti-platform-prod-as1-gke](../aauti-platform-prod-as1-gke/README.md) (asia-south1, regional) | `observability-agent-platformprod` | Platform-prod | in the repo, not deployed yet |
 - **Retention** (`observability/values.yaml`, per tenant):
 
   | Tenant | Logs (Loki) | Metrics (Mimir) |
@@ -38,26 +39,28 @@
   | `media-prod` | 30d | 30d (own tenant because of this; prod policy) |
   | `jitsi-prod` | 30d | 30d (prod policy) |
   | `platform-nonprod` | dev, sandbox, shared 7d; qa, demo 10d | 10d |
+  | `platform-prod` | 30d | 30d (prod policy) |
   | `aauti-hub` | 14d | 30d |
 
 - **Spoke ingest (private):** `observability-gateway-internal` ([gateway-internal-lb.yaml](observability/gateway-internal-lb.yaml))
   is an internal LB on 10.40.16.10 (ingest subnet) reached over VPC peering. It's source-ranged to each spoke's node and pod CIDRs
   (jitsi-nonprod 10.16.0.0/24 + 10.17.0.0/17, media-nonprod-as1 10.32.0.0/24 + 10.33.0.0/17,
-  platform-nonprod-as1 10.4.0.0/24 + 10.5.0.0/17, media-prod-as1 10.36.0.0/24 + 10.37.0.0/17, jitsi-prod 10.20.0.0/24 + 10.21.0.0/17). Global access is off, so only
+  platform-nonprod-as1 10.4.0.0/24 + 10.5.0.0/17, media-prod-as1 10.36.0.0/24 + 10.37.0.0/17, jitsi-prod 10.20.0.0/24 + 10.21.0.0/17,
+  platform-prod-as1 10.12.0.0/24 + 10.13.0.0/17). Global access is off, so only
   spokes in asia-south1 can reach it; a spoke in another region needs the annotation
   `networking.gke.io/internal-load-balancer-allow-global-access: "true"`.
   Spokes verify TLS with SNI `observability-gateway.observability.svc`, a SAN of the existing gateway certificate.
 - **Alloy + kube-state-metrics** collect this whole cluster into tenant `aauti-hub`.
 - **Grafana datasources, all tenants:** `Loki` and `Mimir` (the default) log in as the read-only gateway user
   `grafana-reader` (`gateway.reader` in `observability/values.yaml`). The gateway sets its `X-Scope-OrgID` to every tenant
-  (`aauti-hub|jitsi-nonprod|jitsi-prod|media-nonprod|media-prod|platform-nonprod`, Loki `multi_tenant_queries_enabled`, Mimir
+  (`aauti-hub|jitsi-nonprod|jitsi-prod|media-nonprod|media-prod|platform-nonprod|platform-prod`, Loki `multi_tenant_queries_enabled`, Mimir
   `tenant_federation`) and returns 403 if it tries to push. Results carry `__tenant_id__`; filter with `product` / `env` /
   `cluster` / `namespace` / `app` / `pod` / `container`. A new tenant is included automatically after `observability/deploy.ps1`.
 - **Dashboard Explore** (folder *Explore*, `grafana/dashboards/explore.json`, loaded by `grafana/deploy.ps1` as ConfigMap
   `grafana-dashboards-explore`): fields Product → Env → Cluster → Namespace → App → Pod → Container (Loki label values, each
   narrowed by the ones before it) over `Loki` / `Mimir`, i.e. all products.
 - **No per-tenant datasources** (removed 2026-10-06, so Explore lists only `Loki` and `Mimir`). The folder dashboards
-  (*Jitsi-nonprod*, *Media-nonprod*, *Media-prod*, *Platform-nonprod*) use `Loki` / `Mimir` too; `grafana/deploy.ps1`
+  (*Jitsi-nonprod*, *Jitsi-prod*, *Media-nonprod*, *Media-prod*, *Platform-nonprod*, *Platform-prod*) use `Loki` / `Mimir` too; `grafana/deploy.ps1`
   limits each folder's *Cluster* variable to its own tenant (`label_values(up{__tenant_id__="<tenant>"}, cluster)`, "All" =
   those clusters only), and every panel filters on `$cluster`, so a folder never shows another tenant's data.
   The datasources connect over HTTPS to `observability-gateway.observability.svc` and verify the gateway CA.

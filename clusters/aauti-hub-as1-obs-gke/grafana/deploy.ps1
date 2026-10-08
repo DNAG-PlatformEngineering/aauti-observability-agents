@@ -73,6 +73,7 @@ $dashboards = @{
   "media-nonprod" = @{ title = "Media-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
   "media-prod" = @{ title = "Media-prod"; environments = "prod"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
   "platform-nonprod" = @{ title = "Platform-nonprod"; environments = "dev,qa,demo,sandbox,shared"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
+  "platform-prod" = @{ title = "Platform-prod"; environments = "prod"; shared = @("cluster-health", "resource-usage", "workloads-logs") }
 }
 foreach ($t in $dashboards.Keys) {
   $tmp = Join-Path ([IO.Path]::GetTempPath()) "grafana-dashboards-$t"

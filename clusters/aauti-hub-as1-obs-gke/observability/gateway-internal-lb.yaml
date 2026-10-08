@@ -51,3 +51,6 @@ spec:
     # aauti-jitsi-prod-gke (project aauti-jitsi-prod, VPC aauti-jitsi-prod-vpc)
     - 10.20.0.0/24     # node subnet aauti-jitsi-prod-gke-subnet
     - 10.21.0.0/17     # pod range
+    # aauti-platform-prod-as1-gke (project aauti-platform-prod, VPC aauti-prod-vpc)
+    - 10.12.0.0/24     # node subnet aauti-prod-vpc-as1-gke-subnet
+    - 10.13.0.0/17     # pod range

@@ -101,6 +101,19 @@ tenants:
     metrics:
       retention: 240h        # 10d
       limits: { ingestion_rate: 50000, ingestion_burst_size: 500000, max_global_series_per_user: 300000 }
+  platform-prod:
+    title: Platform-prod
+    # Spokes: aauti-platform-prod-as1-gke (11 apps, environment prod; ~76 pods).
+    # Own tenant because prod is kept 30d. Same limits as platform-nonprod until
+    # there is real volume to size from.
+    dashboards: [cluster-health, resource-usage, workloads-logs]
+    # Retention policy: prod 30 days, logs and metrics.
+    logs:
+      retention: 720h        # 30d
+      limits: { ingestion_rate_mb: 10, ingestion_burst_size_mb: 20, max_global_streams_per_user: 10000 }
+    metrics:
+      retention: 720h        # 30d
+      limits: { ingestion_rate: 50000, ingestion_burst_size: 500000, max_global_series_per_user: 300000 }
   # Hub self-monitoring (this cluster's Alloy). Was "platform" until
   # 2026-10-06; renamed so it isn't confused with the platform app clusters.
   aauti-hub:
