@@ -22,6 +22,10 @@ Second **spoke** of the hub observability stack, onboarded like
   (it would recreate it if missing). Only the LB source ranges were added.
 - **No node-exporter or Prometheus Operator** on this cluster, and no app pod has scrape annotations yet (only GKE's own `kube-system` pods do).
   Node metrics come from kubelet/cAdvisor only; annotated pods are picked up automatically later.
+- **GKE 1.36** (control plane `v1.36.4`; the other clusters are on 1.35). Its kube-dns (component version 36.x) has no
+  `sidecar` container, so nothing serves the annotated metrics port 10054. Since 2026-10-09 the agent scrapes it on
+  9153 (`coredns_*` metrics) instead; before that both kube-dns targets were `up=0`. The other clusters switch to 9153
+  by themselves when GKE upgrades them to 1.36.
 - **Node pool.** The agent and kube-state-metrics run on `apps` (toleration `workload=apps`), because `system` is reserved for GKE.
   Together they request ~120m CPU / 340Mi memory.
 

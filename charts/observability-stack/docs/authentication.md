@@ -32,6 +32,9 @@ Every write and read against Loki and Mimir goes through
 * **Tenant binding**: the gateway derives `X-Scope-OrgID` from the
   authenticated user and returns 403 on any mismatching header (see
   [multi-tenancy.md](multi-tenancy.md)).
+* **No log deletion**: `/loki/api/v1/delete` returns 403 for every user, so a
+  tenant credential can't delete its own logs. Deletion is admin-only, directly
+  on Loki (port-forward), never through the gateway.
 * Loki, Mimir and MinIO are reachable only from inside the hub namespace
   (NetworkPolicy `networkPolicy.enabled`).
 

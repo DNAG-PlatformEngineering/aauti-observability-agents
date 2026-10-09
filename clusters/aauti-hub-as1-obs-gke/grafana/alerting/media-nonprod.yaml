@@ -11,9 +11,9 @@
 # - Annotations use {{ .Labels.x }} / {{ .Value }} rather than the dollar-sign
 #   aliases, so the files never contain a dollar sign (provisioning would treat
 #   it as an environment variable). Keep it that way when adding rules.
-# - kube-dns is not scraped successfully on this cluster (up=0), so there is
-#   deliberately no generic "target down" rule; agent health is covered by
-#   "metrics stopped" / "logs stopped".
+# - There is no generic "target down" rule (kube-dns was up=0 on this cluster
+#   until the agent scraped it on 9153 from 2026-10-09; one could be added now).
+#   Agent health is covered by "metrics stopped" / "logs stopped".
 apiVersion: 1
 groups:
   - orgId: 1

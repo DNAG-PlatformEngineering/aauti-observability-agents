@@ -16,8 +16,18 @@
 ## Observability backends
 
 - **Storage:** in-cluster MinIO (50Gi PVC) holds Loki and Mimir data. No GCS buckets yet.
+  On 2026-10-09: 2.9 GB used (6%); expected to level off at ~10-11 GB once prod has 30 days of data (early November).
+  About 1.5 GB of that is under the tenant names before the 2026-10-06 rename (`jitsi`, `media`, `platform`,
+  `platform-app`); it gets the default 7d retention and should be gone by ~2026-10-13. Retention bounds the size by
+  time, not bytes: a jump in log volume, a stuck compactor or failing uploads to MinIO still grow it.
 - **Loki** (SingleBinary, 20Gi) and **Mimir** (1 replica per component, RF 1) are multi-tenant.
   They're reachable only through `observability-gateway` (NGINX, TLS, one basic-auth user per tenant).
+  The gateway returns 403 on `/loki/api/v1/delete` (since 2026-10-09), so tenant credentials can't delete logs.
+- **Rejected old log lines (expected):** every spoke gets a steady ~100-360 log lines per 6h rejected by Loki as
+  older than 7 days (`greater_than_max_sample_age`, HTTP 400 in the gateway log, "final error sending batch" in the
+  agent log). With `logs.method: api` the agent reopens each pod's log stream about hourly from the last line it saw;
+  for quiet `kube-system` pods (netd, node-local-dns, pdcsi-node, konnectivity-agent, kube-dns) that line predates
+  onboarding, so it's resent and rejected each time. No current logs are lost; Loki accepts the rest of each push.
   The chart's Service is ClusterIP (used by Grafana); spokes come in through the internal LB below.
 - **Tenants:**
 
