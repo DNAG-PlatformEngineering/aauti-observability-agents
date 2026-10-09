@@ -11,7 +11,7 @@
 | Component | Namespace | Release | URL | Folder |
 |---|---|---|---|---|
 | Grafana (chart grafana/grafana 10.5.15) | `grafana` | `grafana` | https://grafana.aauti.ai | [grafana/](grafana/) |
-| MinIO, Loki, Mimir, gateway, Alloy, kube-state-metrics (chart [observability-stack](../../charts/observability-stack), hub mode) | `observability` | `observability` | in-cluster only | [observability/](observability/) |
+| MinIO, Loki, Mimir, gateway, Alloy, kube-state-metrics, k6 (no tests yet) (chart [observability-stack](../../charts/observability-stack), hub mode) | `observability` | `observability` | in-cluster; gateway also on internal LB `10.40.16.10` for the spokes | [observability/](observability/) |
 
 ## Observability backends
 
@@ -81,7 +81,7 @@ tenant, redeploy the affected spokes' agents too (their `deploy.ps1` copies the 
 ## Grafana
 
 - Grafana 12.3.1 (OSS). Local accounts only: sign-up and anonymous access are off, new users get Viewer
-  (Explore needs Editor or Admin). The chart's `grafana`, `grafanaAccess` and `alerting` are disabled in
+  (the *Explore* page needs Editor or Admin; the *Explore* dashboard works for Viewers). The chart's `grafana`, `grafanaAccess` and `alerting` are disabled in
   `observability/values.yaml`, so there are no tenant teams, no *Tenant usage* dashboard and no usage alerts yet.
 - Exposed with GKE Ingress on the global static IP `aauti-hub-vpc-as1-grafana-ip` (8.233.134.60) and a
   Google-managed certificate (`grafana-cert`); HTTP redirects to HTTPS.
@@ -131,6 +131,10 @@ notifications go nowhere until `./grafana/deploy.ps1 -AlertEmails ... -SmtpUser 
 - Recipients, mailbox and password are never stored in the repo. Pass them once with
   `./grafana/deploy.ps1 -AlertEmails "a@aauti.com;b@aauti.com" -SmtpUser alerts@aauti.com` (it prompts for the
   password; or `$env:ALERT_EMAILS` / `SMTP_USER` / `SMTP_PASSWORD`); later runs keep the stored values.
+  Grafana restarts (~1 min) whenever the recipients or the SMTP login are created or changed, since the SMTP
+  login is only read at start-up. A different `-SmtpUser` than the stored one always prompts for its password.
   Without recipients the rules still load but nothing is sent.
-- Provisioned rules are read-only in the UI. To add a cluster, copy `media-nonprod.yaml`, change the
-  `cluster` matcher, group name and `uid` prefix (datasources stay `mimir` / `loki`; every query must filter on `cluster`).
+- Provisioned rules are read-only in the UI. To add a cluster, copy `media-nonprod.yaml` and change the
+  `cluster` matcher, group name, `uid` prefix, the `tenant` label on every rule, the namespace filter of the
+  error-log rule (`aauti-media-.+`), and the agent namespace / GCP project named in the descriptions
+  (datasources stay `mimir` / `loki`; every query must filter on `cluster`).

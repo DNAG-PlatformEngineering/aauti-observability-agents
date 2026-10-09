@@ -6,8 +6,9 @@ stack on the **hub** cluster and a lightweight collection agent on every
 
 > **In this repo.** This is a copy of the POC chart (`D:\k6s\observability-stack`), and these docs
 > still describe the POC. Differences here:
-> - `scripts/` and `environments/` exist only in the POC. Deploy with the per-cluster scripts in
->   `clusters/<cluster>/` instead (see the root `README.md`).
+> - `scripts/`, `environments/` and the CI workflow exist only in the POC (the *Layout* below lists them).
+>   Deploy with the per-cluster scripts in `clusters/<cluster>/` instead (see the root `README.md`). The
+>   sub-charts are committed in `charts/`, so `helm dependency build` isn't needed.
 > - On the hub, the chart's `grafana`, `grafanaAccess` and `alerting` are disabled. Grafana runs
 >   standalone (`clusters/aauti-hub-as1-obs-gke/grafana/`), so there are no tenant teams/orgs, no
 >   *Tenant usage* dashboard and no usage alerts yet.
@@ -37,7 +38,7 @@ stack on the **hub** cluster and a lightweight collection agent on every
 | Requirement | Where it lives |
 |---|---|
 | Hub stack + spoke agents, one chart | `mode: hub` / `mode: spoke` (`profiles/`) |
-| `cluster` + `environment` labels on all data | `cluster.*` → Alloy `external_labels` |
+| `cluster`, `environment` (+ `env`, `product`, `tier`) labels on all data | `cluster.*`, `agent.envLabel`, `agent.environmentFromNamespace` → Alloy `external_labels` / relabel |
 | Loki logs, per-tenant and per-log-type retention | `tenants.<id>.logs.retention`, `.streamRetention` |
 | Mimir metrics, per-tenant retention | `tenants.<id>.metrics.retention` |
 | Multi-tenancy (X-Scope-OrgID) | Loki `auth_enabled`, Mimir (always multi-tenant), agent `tenant_id` / header |

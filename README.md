@@ -29,11 +29,11 @@ environment, qa and demo included, 7 days). Tenants are per product and tier:
 `<product>-nonprod` (`media-nonprod`, `platform-nonprod`, `jitsi-nonprod`) and `<product>-prod` (`media-prod`, `jitsi-prod`, `platform-prod`), because Mimir
 has only one metrics retention per tenant. The hub monitors itself as `aauti-hub`. Per-tenant values: [hub README](clusters/aauti-hub-as1-obs-gke/README.md).
 
-**Explore in Grafana:** one `Loki` and one `Mimir` datasource (the default) read all tenants at once. Filter with labels:
+**Explore in Grafana** (https://grafana.aauti.ai): one `Loki` and one `Mimir` datasource (the default) read all tenants at once. Filter with labels:
 
 ```
 product     media | jitsi | platform | aauti-hub
-  env       dev | qa | demo | sandbox | shared | prod     (same values as `environment`)
+  env       dev | qa | demo | sandbox | uat | staging | shared | prod     (same values as `environment`)
     cluster → namespace → app / pod / container
 ```
 e.g. `{product="media", env="qa"} |= "error"` (Loki), `kube_pod_container_status_restarts_total{product="platform", env="dev"}` (Mimir).

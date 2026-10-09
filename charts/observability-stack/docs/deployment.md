@@ -7,6 +7,8 @@
 > The *Production (GKE + GCS)* steps aren't done yet: the hub uses MinIO, single replicas, RF 1.
 > In the table below, read tenant `aauti-hub` for both `platform` and `loadtest` (`k6.tenant: aauti-hub`),
 > and Grafana is standalone with one federated `Loki` / `Mimir` datasource pair, not per-tenant ones.
+> There is no CI here (`scripts/ci-check.sh` and `.github/` are POC-only), and the sub-charts are committed
+> in `charts/`, so `helm dependency build` isn't needed.
 
 ## Values layering
 
@@ -155,7 +157,8 @@ contexts unless `-Yes` is passed.
 ### Collected signals (per spoke)
 
 * **Logs:** every container (Kubernetes API or `/var/log/pods`), labels
-  `cluster, environment, namespace, pod, container, app, node, job, log_type`.
+  `cluster, environment, namespace, pod, container, app, node, job, log_type`, plus
+  `env`, `product` and `tier` when `agent.envLabel`, `cluster.product` and `cluster.tier` are set.
   Loki adds `detected_level`.
 * **Events:** Kubernetes events as logs (`log_type="k8s-event"`).
 * **Metrics:** cAdvisor (allow-listed), kubelet, kube-state-metrics,

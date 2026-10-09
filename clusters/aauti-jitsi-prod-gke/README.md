@@ -19,8 +19,8 @@
 
 ## Differences from jitsi-nonprod
 
-- **Own tenant `jitsi-prod`** (prod 30d; nonprod is `jitsi-nonprod`). In Grafana it's `__tenant_id__="jitsi-prod"` in the
-  shared `Loki` / `Mimir` datasources.
+- **Own tenant `jitsi-prod`** (prod 30d; nonprod is `jitsi-nonprod`). In Grafana, filter the
+  shared `Loki` / `Mimir` datasources with `product="jitsi", env="prod"`.
 - **No per-line environment.** Prod rooms carry no environment in their name (e.g. `class_<name>-<id>-1@muc.video.aauti.com`),
   so everything is `prod` and `agent.logs.environmentFromLine` is off.
 - **Network.** There was no peering at all; `network/aauti-jitsi-prod.ps1` creates `hub-to-jitsi-prod` and
@@ -45,6 +45,11 @@
 
 ```powershell
 cd D:\aauti-observability-agents
+
+# Kube contexts for the hub and this cluster (kubectl needs gke-gcloud-auth-plugin:
+#    gcloud components install gke-gcloud-auth-plugin). deploy.ps1 / verify.ps1 check both.
+gcloud container clusters get-credentials aauti-hub-as1-obs-gke --zone asia-south1-a --project aauti-hub
+gcloud container clusters get-credentials aauti-jitsi-prod-gke --zone asia-south1-a --project aauti-jitsi-prod
 
 # 1. Network: both peerings. Dry run first.
 ./network/aauti-jitsi-prod.ps1 -WhatIf

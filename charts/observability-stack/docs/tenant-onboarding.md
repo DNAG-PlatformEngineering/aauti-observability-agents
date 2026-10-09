@@ -4,7 +4,10 @@
 > `clusters/aauti-jitsi-nonprod-gke/README.md` instead: it uses the per-cluster `deploy.ps1` /
 > `verify.ps1`, the internal LB `gateway-internal-lb.yaml`, and adds a dashboard folder to the
 > standalone Grafana. There are no per-tenant datasources: the hub upgrade adds the new tenant to
-> `grafana-reader`, so the shared `Loki` / `Mimir` datasources read it automatically. `scripts/onboard-spoke.ps1` and `environments/` are POC-only.
+> `grafana-reader`, so the shared `Loki` / `Mimir` datasources read it automatically. Two steps are easy to
+> miss: add the tenant to `$dashboards` in `clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1`, and add the
+> spoke's node + pod ranges to `loadBalancerSourceRanges` in `gateway-internal-lb.yaml` (plus a
+> `network/aauti-<product>-<tier>.ps1`). `scripts/onboard-spoke.ps1` and `environments/` are POC-only.
 
 Example: a new **Payments** cluster. Tenant id `payments`, cluster name
 `payments-prod`.
@@ -93,7 +96,8 @@ agent:
 ```
 
 The Secret name below is the default (`agent.auth.secretName`); the clusters in this repo use
-`observability-agent-<cluster>-auth` instead (see `clusters/*/observability-agent/`).
+`<release>-auth` with release `observability-agent-<product><tier>`, e.g. `observability-agent-jitsinonprod-auth`
+(see `clusters/*/observability-agent/`).
 
 ```bash
 kubectl --context payments-prod create namespace observability-agent

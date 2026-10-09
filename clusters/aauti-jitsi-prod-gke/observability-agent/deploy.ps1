@@ -22,12 +22,26 @@ param(
 $ErrorActionPreference = "Stop"
 $chart = Resolve-Path "$PSScriptRoot/../../../charts/observability-stack"
 
+# --- preflight: kubectl must reach both clusters ------------------------------
+if (-not (Get-Command gke-gcloud-auth-plugin -ErrorAction SilentlyContinue)) {
+  throw "gke-gcloud-auth-plugin not found - run: gcloud components install gke-gcloud-auth-plugin"
+}
+foreach ($c in @($HubContext, $SpokeContext)) {
+  kubectl config get-contexts $c *> $null
+  if ($LASTEXITCODE -ne 0) {
+    $p = $c -split "_", 4   # gke_<project>_<location>_<cluster>
+    throw "kube context $c missing - run: gcloud container clusters get-credentials $($p[3]) --location $($p[2]) --project $($p[1])"
+  }
+}
+
 # --- preflight: private path must exist before anything is installed --------
-$peer = gcloud compute networks peerings list --network aauti-jitsi-prod-vpc --project aauti-jitsi-prod `
-  --format="csv[no-heading](peerings[].name,peerings[].state)" | Out-String
-if ($peer -notmatch "jitsi-prod-to-hub") { throw "VPC peering jitsi-prod-to-hub missing - run network/aauti-jitsi-prod.ps1" }
+$peer = (gcloud compute networks peerings list --network aauti-jitsi-prod-vpc --project aauti-jitsi-prod --format=json | ConvertFrom-Json).peerings |
+  Where-Object name -eq "jitsi-prod-to-hub" | ForEach-Object state
+if ($peer -ne "ACTIVE") { throw "VPC peering jitsi-prod-to-hub missing or not ACTIVE (state: '$peer') - run network/aauti-jitsi-prod.ps1" }
 $lbIp = kubectl --context $HubContext -n observability get svc observability-gateway-internal -o jsonpath="{.status.loadBalancer.ingress[0].ip}"
 if ($lbIp -ne $GatewayIp) { throw "hub internal LB not ready (got '$lbIp', want $GatewayIp) - deploy hub observability first" }
+$ranges = kubectl --context $HubContext -n observability get svc observability-gateway-internal -o jsonpath="{.spec.loadBalancerSourceRanges}"
+if ($ranges -notmatch "10\.21\.0\.0/17") { throw "hub internal LB does not allow this cluster's pod range - deploy hub observability first" }
 
 # --- credentials from the hub (never written to the repo) -------------------
 $pwB64 = kubectl --context $HubContext -n observability get secret observability-tenant-credentials -o jsonpath="{.data.$Tenant}"
@@ -44,6 +58,7 @@ try {
 
   kubectl --context $SpokeContext create namespace $Namespace --dry-run=client -o yaml |
     kubectl --context $SpokeContext apply -f -
+  if ($LASTEXITCODE -ne 0) { throw "creating namespace $Namespace failed" }
   kubectl --context $SpokeContext -n $Namespace create secret generic $Release-auth `
     --from-file=password="$tmp/password" --dry-run=client -o yaml |
     kubectl --context $SpokeContext apply -f -

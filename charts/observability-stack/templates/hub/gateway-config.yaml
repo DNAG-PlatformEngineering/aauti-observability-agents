@@ -142,6 +142,8 @@ data:
           proxy_set_header Upgrade       $http_upgrade;
           proxy_set_header Connection    "upgrade";
         }
+        # Log deletion (compactor delete requests) is admin-only, never through the gateway.
+        location /loki/api/v1/delete       { return 403 "log deletion is not allowed\n"; }
         location /loki/api/                { proxy_pass $loki_read; }
 
         location / { return 404 "not found\n"; }

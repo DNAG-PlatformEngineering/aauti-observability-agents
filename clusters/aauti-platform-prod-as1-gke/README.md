@@ -44,6 +44,11 @@ Platform **prod spoke** of the hub observability stack, onboarded like
 ```powershell
 cd D:\aauti-observability-agents
 
+# Kube contexts for the hub and this cluster (kubectl needs gke-gcloud-auth-plugin:
+#    gcloud components install gke-gcloud-auth-plugin). deploy.ps1 / verify.ps1 check both.
+gcloud container clusters get-credentials aauti-hub-as1-obs-gke --zone asia-south1-a --project aauti-hub
+gcloud container clusters get-credentials aauti-platform-prod-as1-gke --region asia-south1 --project aauti-platform-prod
+
 # 0. Network check (read-only on the current state).
 ./network/aauti-platform-prod.ps1 -WhatIf
 
@@ -51,11 +56,10 @@ cd D:\aauti-observability-agents
 ./clusters/aauti-hub-as1-obs-gke/observability/deploy.ps1
 
 # 2. Hub Grafana: Platform-prod dashboards (Grafana pod restarts once).
-#    It also deploys the email alerting + SMTP (live since 2026-10-08; see the hub README, Alerts).
+#    It also deploys the email alerting + SMTP (deployed 2026-10-08, no recipients yet; see the hub README, Alerts).
 ./clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1
 
 # 3. Spoke: agent in the new namespace observability-agent-platformprod.
-gcloud container clusters get-credentials aauti-platform-prod-as1-gke --region asia-south1 --project aauti-platform-prod
 ./clusters/aauti-platform-prod-as1-gke/observability-agent/deploy.ps1
 
 # 4. Verify (read-only), ~10-12 minutes after step 3 (first-start "timestamp too old" 400s must leave the window).
@@ -74,6 +78,10 @@ the LB ranges and Grafana, and redeploy observability and Grafana.
 
 The shared templates *Cluster health*, *Resource usage* and *Workloads & logs*, with
 **Environment (prod) → Cluster → Namespace** selectors.
+
+The *Nodes* row of *Resource usage* stays empty: it needs node-exporter, which this cluster does not run.
+
+Everything is also in the **Explore** dashboard (folder *Explore*; Product / Env / Cluster / Namespace / App selectors).
 
 Raw queries: *Explore* → `Loki` / `Mimir` (all tenants), e.g. Loki `{product="platform", env="prod"}` or `{cluster="aauti-platform-prod-as1-gke", namespace="aauti-api"}`
 or Mimir `kube_deployment_status_replicas_unavailable{cluster="aauti-platform-prod-as1-gke"}`.

@@ -41,6 +41,11 @@ Second **spoke** of the hub observability stack, onboarded like
 ```powershell
 cd D:\aauti-observability-agents
 
+# Kube contexts for the hub and this cluster (kubectl needs gke-gcloud-auth-plugin:
+#    gcloud components install gke-gcloud-auth-plugin). deploy.ps1 / verify.ps1 check both.
+gcloud container clusters get-credentials aauti-hub-as1-obs-gke --zone asia-south1-a --project aauti-hub
+gcloud container clusters get-credentials aauti-media-nonprod-as1-gke --zone asia-south1-a --project aauti-media-nonprod
+
 # 1. Hub: tenant "media-nonprod" + LB source ranges. The gateway pod restarts once.
 ./clusters/aauti-hub-as1-obs-gke/observability/deploy.ps1
 
@@ -67,6 +72,10 @@ the LB ranges and Grafana, and redeploy observability and Grafana.
 The shared templates *Cluster health*, *Resource usage* and *Workloads & logs*, with
 **Environment (dev, qa, demo, sandbox, shared) → Cluster → Namespace** selectors. Add media-specific dashboards to
 `charts/observability-stack/dashboards/tenants/media-nonprod/` once the apps expose metrics.
+
+The *Nodes* row of *Resource usage* stays empty: it needs node-exporter, which this cluster does not run.
+
+Everything is also in the **Explore** dashboard (folder *Explore*; Product / Env / Cluster / Namespace / App selectors).
 
 Raw queries: *Explore* → `Loki` / `Mimir` (all tenants), e.g. Loki `{product="media", cluster="aauti-media-nonprod-as1-gke"}` or `{cluster="aauti-media-nonprod-as1-gke", environment="qa"}`
 or Mimir `kube_pod_container_status_restarts_total{cluster="aauti-media-nonprod-as1-gke"}`.

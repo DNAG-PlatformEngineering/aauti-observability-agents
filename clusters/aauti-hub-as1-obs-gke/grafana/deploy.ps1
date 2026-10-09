@@ -156,8 +156,10 @@ policies:
 
 # SMTP login: Secret grafana-smtp, read by Grafana as GF_SMTP_USER /
 # GF_SMTP_PASSWORD / GF_SMTP_FROM_ADDRESS (values.yaml envValueFrom).
-if (-not $SmtpUser) { $SmtpUser = & $stored grafana-smtp user }
-if ($SmtpUser -and -not $SmtpPassword) { $SmtpPassword = & $stored grafana-smtp password }
+$storedSmtpUser = & $stored grafana-smtp user
+if (-not $SmtpUser) { $SmtpUser = $storedSmtpUser }
+# Reuse the stored password only for the same mailbox; a new mailbox prompts below.
+if ($SmtpUser -and -not $SmtpPassword -and $SmtpUser -eq $storedSmtpUser) { $SmtpPassword = & $stored grafana-smtp password }
 if ($SmtpUser -and -not $SmtpPassword) {
   $sec = Read-Host "SMTP password for $SmtpUser" -AsSecureString
   $SmtpPassword = [Net.NetworkCredential]::new("", $sec).Password
@@ -184,7 +186,8 @@ try {
       --dry-run=client -o yaml | kubectl apply -f -
     if ($LASTEXITCODE -ne 0) { throw "creating grafana-smtp failed" }
     $after = kubectl -n $Namespace get secret grafana-smtp -o jsonpath="{.metadata.resourceVersion}"
-    if ($before -and $before -ne $after) { $provisioningChanged = $true }   # env vars: only read at start-up
+    # env vars are only read at start-up: restart on a change and on first creation
+    if ($before -ne $after) { $provisioningChanged = $true }
   }
 } finally {
   Remove-Item -Recurse -Force $tmp

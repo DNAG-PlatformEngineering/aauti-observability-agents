@@ -1,6 +1,7 @@
-# Hub profile: central multi-tenant stack. Combine with an environment file:
+# Hub profile: central multi-tenant stack. Combine with the hub's values file
+# (in this repo: clusters/aauti-hub-as1-obs-gke/observability/deploy.ps1 does this):
 #   helm upgrade --install observability . -n observability \
-#     -f profiles/hub.yaml -f environments/<env>/hub.yaml
+#     -f profiles/hub.yaml -f ../../clusters/aauti-hub-as1-obs-gke/observability/values.yaml
 mode: hub
 
 gateway: { enabled: true }

@@ -64,6 +64,11 @@ Jitsi release are **not modified**. The agent only *reads*:
 ```powershell
 cd D:\aauti-observability-agents
 
+# 0. Kube contexts for the hub and this cluster (kubectl needs gke-gcloud-auth-plugin:
+#    gcloud components install gke-gcloud-auth-plugin). deploy.ps1 / verify.ps1 check both.
+gcloud container clusters get-credentials aauti-hub-as1-obs-gke --zone asia-south1-a --project aauti-hub
+gcloud container clusters get-credentials aauti-jitsi-nonprod-gke --zone asia-south1-a --project aauti-jitsi-noprod
+
 # 1. Network: static internal IP + VPC peering (both projects). Dry run first.
 ./network/aauti-jitsi-nonprod.ps1 -WhatIf
 ./network/aauti-jitsi-nonprod.ps1
@@ -107,7 +112,8 @@ by all environments of a cluster.
   - `jitsi` namespace logs
 
 Raw queries: *Explore* → `Loki` / `Mimir` (all tenants), e.g. Loki `{product="jitsi", cluster="aauti-jitsi-nonprod-gke"}` or `{cluster="aauti-jitsi-nonprod-gke", namespace="jitsi"}`
-or Mimir `jitsi_participants{tier="nonprod"}`.
+or Mimir `jitsi_participants{tier="nonprod"}`. The **Explore** dashboard (folder *Explore*; Product / Env / Cluster /
+Namespace / App selectors) shows the same logs without writing queries.
 
 ## Standard for the next clusters
 
@@ -117,7 +123,7 @@ For each new cluster:
    (`media`, `jitsi`, `platform`, …; the `product` filter of the single `Loki` / `Mimir` datasources) and
    `cluster.environment`, and enables `agent.environmentFromNamespace` and `agent.envLabel` (`env` = `environment`).
    - Namespaces ending in `-dev`, `-qa`, `-demo`, `-sandbox`, `-uat` or `-staging` get that environment. For example, `aauti-api-qa` becomes `environment=qa` on platform-nonprod.
-   - Every other namespace, and the node metrics, get `cluster.environment`. Use the single environment for one-env clusters (media-prod-as1: `prod`; `-prod` is not a namespace suffix, so it falls through to this), and `shared` for multi-env clusters (jitsi-nonprod; media-nonprod-as1: `aauti-media-events`, `media-gateway`; platform-nonprod: `argocd`, `platform-gateway`).
+   - Every other namespace, and the node metrics, get `cluster.environment`. Use the single environment for one-env clusters (media-prod-as1: `prod`; `-prod` is not a namespace suffix, so it falls through to this), and `shared` for multi-env clusters (jitsi-nonprod; media-nonprod-as1: `aauti-media-events`, `media-gateway`; platform-nonprod: `platform-gateway`).
 1. **Tenant.** Use one per product and tier: `<product>-nonprod` (`jitsi-nonprod`, `media-nonprod`, `platform-nonprod`, …) and `<product>-prod` (e.g. `media-prod`), not one per cluster. Prod is separate because it's kept 30d (dev/sandbox 7d, qa/demo 10d) and Mimir has only one metrics retention per tenant. Clusters within a tenant are separated by `environment` and `cluster` labels. Add the tenant to the hub `observability/values.yaml`, plus a dashboard provider in `grafana/values.yaml` and an entry in `$dashboards` in `deploy.ps1` (no datasources: `Loki` / `Mimir` read every tenant).
 2. **Network.**
    - Hub side: copy `network/aauti-jitsi-nonprod.ps1` and change the spoke project, VPC and peering names. Media and platform VPCs are already peered with the hub; for those, the script only checks the peering (see `network/aauti-media-nonprod.ps1`).
@@ -125,15 +131,18 @@ For each new cluster:
    - Add the spoke's node and pod ranges to `loadBalancerSourceRanges` in `gateway-internal-lb.yaml`.
    - The LB is in asia-south1 without global access. For a spoke in another region, add
      `networking.gke.io/internal-load-balancer-allow-global-access: "true"` to that Service.
-3. **Agent.** Copy `clusters/aauti-jitsi-nonprod-gke/observability-agent/` to `clusters/<gke-cluster-name>/observability-agent/`.
-   - In `values.yaml`, change `cluster.name`, `cluster.environment` and `agent.tenant`, plus the node pool and tolerations.
+3. **Agent.** Copy the agent folder of the closest existing cluster to `clusters/<gke-cluster-name>/observability-agent/`:
+   `clusters/aauti-media-nonprod-as1-gke/` for a plain app cluster, this folder only for a Jitsi cluster.
+   - In `values.yaml`, change `cluster.name`, `cluster.environment`, `cluster.product`, `cluster.tier` and `agent.tenant`, plus the node pool and tolerations.
      Don't use a pool tainted `components.gke.io/gke-managed-components` (reserved for GKE).
-   - In `verify.ps1`, change the contexts, peering names, node / pod ranges and the expected `environment`.
-   - Namespace **and** Helm release = `observability-agent-<cluster without -gke and dashes>` (e.g. `observability-agent-jitsinonprod`; `aauti-media-nonprod-as1-gke` uses `observability-agent-medianonprod`, the only media nonprod cluster with an agent; `aauti-media-prod-as1-gke` uses `observability-agent-mediaprod`). Set `$Namespace` / `$Release` in `deploy.ps1` and `verify.ps1`, and `agent.configMapName`, `agent.auth.secretName`, `agent.tls.caSecretName` plus the matching `alloy` entries in `values.yaml`, to that prefix.
+   - When copying from this folder, turn off the Jitsi-only settings: `agent.logs.environmentFromLine` and `agent.metrics.prometheusOperator.namespaces: [jitsi]`.
+   - In `deploy.ps1`, change `$SpokeContext`, `$Namespace`, `$Release`, `$Tenant`, the peering network / project / name in the preflight and the pod range in the LB source-range check.
+   - In `verify.ps1`, change `$Cluster`, `$Tenant`, `$Product`, the contexts, peering names, node / pod ranges, the expected `tier` and the expected `environment`.
+   - Namespace **and** Helm release = `observability-agent-<product><tier>` (e.g. `observability-agent-jitsinonprod`, `observability-agent-medianonprod`, `observability-agent-platformprod`). Set `$Namespace` / `$Release` in `deploy.ps1` and `verify.ps1`, and `agent.configMapName`, `agent.auth.secretName`, `agent.tls.caSecretName` plus the matching `alloy` entries in `values.yaml`, to that prefix.
    - Keep `hubUrl` / `serverName` as they are.
    - Enable `prometheusOperator` only if the app ships ServiceMonitors.
    - If the cluster has no node-exporter, set `agent.metrics.nodeExporter.enabled=false` or install one.
-   - For very high log volume, switch to `alloy.controller.type: daemonset` with `logs.method: file` (example: `D:\k6s\observability-stack\environments\prod-example\spoke-media.yaml`).
+   - For very high log volume, switch to `alloy.controller.type: daemonset` with `logs.method: file` (drop `replicas` and `volumeClaimTemplates` from the `alloy.controller` block).
 4. **Roll out** in the same order: network → hub → Grafana → agent → `verify.ps1`.
    On a cluster whose pods are older than 7 days, the agent's first minutes replay old pod logs that Loki rejects
    (HTTP 400 "timestamp too old"); the gateway status check fails until those leave its 10-minute window, so run `verify.ps1` ~10-12 minutes after the agent install.

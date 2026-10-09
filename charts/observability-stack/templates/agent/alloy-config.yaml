@@ -17,9 +17,10 @@
 {{- $lineEnv := $a.logs.environmentFromLine.enabled }}
 {{- /* Optional `env` alias of the final `environment`: a constant external label
      when environment is per cluster, else copied by a last relabel stage
-     (logs: loki.relabel.env_alias right before loki.write). */}}
+     (logs: loki.relabel.env_alias right before loki.write). A per-line environment
+     also needs the copy; the stream's env then overrides the external label. */}}
 {{- $envAlias := $a.envLabel.enabled }}
-{{- $envCopy := and $envAlias $envNs }}
+{{- $envCopy := and $envAlias (or $envNs $lineEnv) }}
 {{- $lfinal := ternary "loki.relabel.env_alias.receiver" "loki.write.hub.receiver" $envCopy }}
 {{- $lwrite := ternary "loki.process.line_environment.receiver" $lfinal $lineEnv }}
 {{- $lout := ternary "loki.relabel.environment.receiver" $lwrite $envNs }}

@@ -9,7 +9,7 @@
 # Layering (see README.md):
 #   values.yaml                     <- this file: every knob, documented
 #   profiles/hub.yaml | spoke.yaml  <- turns the right sub-charts on
-#   environments/<env>/<name>.yaml  <- per cluster / per tenant settings
+#   clusters/<cluster>/.../values.yaml (repo root) <- per cluster / per tenant settings
 #
 # NOTE on fixed resource names: several Secrets/ConfigMaps created by this
 # chart have fixed names (prefix "observability-") because sub-chart values
@@ -155,8 +155,12 @@ agent:
 # Every key under `tenants` becomes:
 #   * a gateway user (username == tenant id) with a generated password
 #   * an X-Scope-OrgID tenant in Loki and Mimir with its own limits/retention
-#   * Grafana datasources "Loki – <Title>" / "Mimir – <Title>"
-#   * a Grafana team + folder with that tenant's dashboards
+#   * with the chart's own Grafana (grafana.enabled): datasources "Loki – <Title>" /
+#     "Mimir – <Title>" and a team + folder with that tenant's dashboards. In this
+#     repo Grafana is standalone (clusters/aauti-hub-as1-obs-gke/grafana) with one
+#     federated Loki / Mimir datasource pair (gateway.reader), so none of these exist.
+#   * optional `environments: [dev, qa, ...]`: the Environment selector values of
+#     the tenant's dashboards (chart Grafana only; default dev,qa,demo,sandbox,shared).
 # See docs/tenant-onboarding.md to add one.
 # =============================================================================
 tenants:
@@ -269,7 +273,7 @@ k6:
     repository: docker.io/grafana/k6
     tag: 1.3.0
   # -- Tenant that receives k6 results (must exist in `tenants`).
-  tenant: loadtest
+  tenant: platform
   # -- Each test becomes a CronJob (suspended by default). Run on demand with:
   #   kubectl create job --from=cronjob/k6-<name> k6-<name>-manual
   tests: {}
@@ -531,7 +535,7 @@ mimir:
 observabilityBuckets: [loki-chunks, loki-ruler, loki-admin, mimir-blocks, mimir-ruler, mimir-alertmanager]
 
 # Local stand-in for GCS/S3. Disable and point loki/mimir storage at GCS in
-# production (see environments/prod-example/hub-gcs.yaml).
+# production (loki.loki.storage / mimir.mimir.structuredConfig; not done yet in this repo).
 minio:
   enabled: false
   fullnameOverride: observability-minio
@@ -620,7 +624,7 @@ alloy:
   controller:
     # "statefulset" (1 replica) pairs with agent.logs.method=api; use
     # "daemonset" with agent.logs.method=file for high-volume log clusters
-    # (see environments/prod-example/spoke-media.yaml).
+    # (drop replicas / volumeClaimTemplates for a DaemonSet).
     type: statefulset
     replicas: 1
     # Persistent agent state: log read positions + the metrics WAL. Without it

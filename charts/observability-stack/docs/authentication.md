@@ -53,7 +53,10 @@ kubectl -n observability get secret observability-hub-ca -o jsonpath='{.data.ca\
    `kubectl -n observability-agent-jitsinonprod rollout restart statefulset/observability-agent-jitsinonprod-alloy`.
    The cluster's `observability-agent/deploy.ps1` does both (it re-copies the password from the hub).
 3. Grafana picks the new password up from the mounted Secret after its
-   datasources reload (restart Grafana to force it).
+   datasources reload (restart Grafana to force it). In this repo Grafana only uses `grafana-reader`, so a
+   tenant rotation doesn't touch it. After rotating `grafana-reader`, re-run
+   `clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1`: it copies the password into Secret
+   `grafana-hub-datasource` (namespace `grafana`).
 
 To rotate by regeneration instead, delete the key from
 `observability-tenant-credentials` and upgrade.

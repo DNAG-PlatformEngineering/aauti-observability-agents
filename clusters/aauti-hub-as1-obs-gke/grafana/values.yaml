@@ -147,7 +147,8 @@ datasources:
 
 # Dashboards as code: one provider + folder per tenant. deploy.ps1 renders the
 # ConfigMap grafana-dashboards-<tenant> from charts/observability-stack/dashboards
-# (shared templates listed in the tenant's `dashboards` + dashboards/tenants/<tenant>/).
+# (the shared templates and dashboards/tenants/<extras>/ listed per tenant in the
+# `$dashboards` table of deploy.ps1; jitsi-prod reuses tenants/jitsi-nonprod/).
 dashboardProviders:
   dashboardproviders.yaml:
     apiVersion: 1

@@ -30,7 +30,10 @@ foreach ($p in @(@("aauti-hub", "aauti-hub-vpc", "hub-to-media-nonprod"), @("aau
 }
 $fr = gcloud compute forwarding-rules list --project aauti-hub --filter="IPAddress=$GatewayIp" --format=json | ConvertFrom-Json
 Check ($fr -and $fr[0].loadBalancingScheme -eq "INTERNAL") "gateway LB $GatewayIp is INTERNAL (scheme: $($fr[0].loadBalancingScheme))"
-$pub = gcloud compute forwarding-rules list --project aauti-hub --format="value(IPAddress,target)" | Select-String "observability-gateway"
+# GKE names forwarding rules with hashes; the owning Service / Ingress is only in
+# the description. Grafana and ArgoCD have their own external rules in this project.
+$pub = gcloud compute forwarding-rules list --project aauti-hub --format=json | ConvertFrom-Json |
+  Where-Object { $_.loadBalancingScheme -like "EXTERNAL*" -and $_.description -match '"observability/observability-gateway' }
 Check (-not $pub) "no external forwarding rule exposes the gateway"
 $cfg = kubectl --context $SpokeContext -n $Namespace get configmap $Release-config -o jsonpath="{.data.config\.alloy}"
 $urls = [regex]::Matches($cfg, 'url\s*=\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value }

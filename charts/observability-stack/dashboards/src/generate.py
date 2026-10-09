@@ -2,8 +2,9 @@
 """Dashboards as code.
 
 Generates the Grafana dashboard JSON files in ../ (one template per
-dashboard, shared by every tenant). Placeholders are substituted by the Helm
-chart per tenant: __METRICS_DS__, __LOGS_DS__, __TENANT__, __TENANT_TITLE__.
+dashboard, shared by every tenant). Placeholders are substituted per tenant by
+clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1 (or the chart's own Grafana):
+__METRICS_DS__, __LOGS_DS__, __TENANT__, __TENANT_TITLE__, __ENVIRONMENTS__.
 
     python dashboards/src/generate.py      # rewrite ../*.json
 
@@ -169,7 +170,7 @@ def dashboard(uid_suffix, title, panels, variables, tags, desc, refresh="1m", ti
 def env_var():
     # Fixed list, so every environment is selectable even before it has data.
     # __ENVIRONMENTS__ is replaced per tenant / folder at deploy time
-    # (nonprod: dev,qa,demo,sandbox,shared; prod: prod,shared).
+    # (nonprod: dev,qa,demo,sandbox,shared; prod: prod).
     return {
         "name": "environment", "label": "Environment", "type": "custom",
         "query": "__ENVIRONMENTS__", "multi": True, "includeAll": True, "allValue": ".+",
@@ -191,7 +192,7 @@ def log_env_cluster_vars(ns_sel=""):
     return env_cluster_vars()
 
 def cluster_vars(extra=None):
-    # Environments come from the logs (superset: namespace envs + per-line envs).
+    # Environment is the fixed per-tenant list (env_var); cluster from metrics.
     v = log_env_cluster_vars() + [
         var_query("namespace", "Namespace", 'label_values(kube_pod_info{cluster=~"$cluster", environment=~"$environment|shared"}, namespace)'),
     ]

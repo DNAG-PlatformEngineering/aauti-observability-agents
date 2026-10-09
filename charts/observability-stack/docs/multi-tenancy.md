@@ -17,9 +17,10 @@
   username, the Grafana team name and in datasource/dashboard UIDs, so it must
   match `^[a-z0-9][a-z0-9_-]*$`.
 * Inside a tenant, every series and stream carries `cluster` and
-  `environment` labels (set per release in `cluster.*`). That means several
-  clusters can share a tenant, for example `media-prod` and `media-nonprod` in
-  tenant `media`, and still be filtered apart.
+  `environment` labels (set per release in `cluster.*`), plus `env`, `product`
+  and `tier` where enabled. That means several clusters can share a tenant and
+  still be filtered apart. In this repo the tenants are per product and tier
+  (`media-nonprod`, `media-prod`, …), so prod and nonprod never share one.
 
 ## How isolation is enforced
 

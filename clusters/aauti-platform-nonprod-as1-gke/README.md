@@ -42,6 +42,11 @@ reference setup [aauti-jitsi-nonprod-gke](../aauti-jitsi-nonprod-gke/README.md))
 ```powershell
 cd D:\aauti-observability-agents
 
+# Kube contexts for the hub and this cluster (kubectl needs gke-gcloud-auth-plugin:
+#    gcloud components install gke-gcloud-auth-plugin). deploy.ps1 / verify.ps1 check both.
+gcloud container clusters get-credentials aauti-hub-as1-obs-gke --zone asia-south1-a --project aauti-hub
+gcloud container clusters get-credentials aauti-platform-nonprod-as1-gke --zone asia-south1-a --project aauti-platform-noprod
+
 # 0. Network check (changes nothing on the current state).
 ./network/aauti-platform-nonprod.ps1 -WhatIf
 
@@ -70,6 +75,10 @@ the LB ranges and Grafana, and redeploy observability and Grafana.
 
 The shared templates *Cluster health*, *Resource usage* and *Workloads & logs*, with
 **Environment (dev, qa, demo, sandbox, shared) → Cluster → Namespace** selectors.
+
+The *Nodes* row of *Resource usage* stays empty: it needs node-exporter, which this cluster does not run.
+
+Everything is also in the **Explore** dashboard (folder *Explore*; Product / Env / Cluster / Namespace / App selectors).
 
 Raw queries: *Explore* → `Loki` / `Mimir` (all tenants), e.g. Loki `{product="platform", cluster="aauti-platform-nonprod-as1-gke"}` or `{cluster="aauti-platform-nonprod-as1-gke", namespace="aauti-api-qa"}`
 or Mimir `kube_deployment_status_replicas_unavailable{cluster="aauti-platform-nonprod-as1-gke"}`.
