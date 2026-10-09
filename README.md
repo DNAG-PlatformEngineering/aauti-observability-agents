@@ -63,3 +63,5 @@ with its sub-charts vendored. Changes, all opt-in (defaults render as before):
 - `gateway.reader`: a read-only gateway user pinned to all tenants (Loki / Mimir tenant federation) for Grafana's
   single `Loki` / `Mimir` datasources; push returns 403 for it.
 - Tenant-usage alert summaries escape `$labels` / `$values` as `$$` (Grafana interpolates env vars in provisioned files).
+- Annotated-pod scraping: GKE kube-dns 36+ (GKE 1.36) is scraped on 9153 (`coredns_*`) instead of its annotated
+  port 10054, which nothing serves since the sidecar container was removed (first seen on media-nonprod-as1).

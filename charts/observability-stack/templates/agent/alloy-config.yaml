@@ -205,6 +205,15 @@ data:
         replacement   = "$1:$2"
         target_label  = "__address__"
       }
+      // GKE kube-dns 36+ (GKE 1.36) has no sidecar container, so nothing serves
+      // the annotated port 10054; its metrics (coredns_*) are on 9153.
+      rule {
+        source_labels = ["namespace", "__meta_kubernetes_pod_label_k8s_app", "__meta_kubernetes_pod_annotation_components_gke_io_component_version", "__meta_kubernetes_pod_ip"]
+        separator     = ";"
+        regex         = "kube-system;kube-dns;(3[6-9]|[4-9][0-9])\\..*;(.+)"
+        replacement   = "$2:9153"
+        target_label  = "__address__"
+      }
       rule {
         source_labels = ["namespace", "app"]
         separator     = "/"
