@@ -129,7 +129,9 @@ notifications go nowhere until `./grafana/deploy.ps1 -AlertEmails ... -SmtpUser 
 | Group | File | Rules |
 |---|---|---|
 | Media-nonprod | [grafana/alerting/media-nonprod.yaml](grafana/alerting/media-nonprod.yaml) | crash loop, image pull, OOMKilled, frequent restarts, deployment unavailable, pod Pending/Unknown, HPA at max, memory > 90% of limit, PVC > 85%, node NotReady (critical), node pressure, error-log spike, metrics / logs stopped (critical) |
-| Aauti-hub | [grafana/alerting/aauti-hub.yaml](grafana/alerting/aauti-hub.yaml) | hub volume > 75% for 15m (warning), > 90% for 5m (critical); namespaces `observability` and `grafana`. Added 2026-10-12, not deployed yet |
+| Jitsi-nonprod | [grafana/alerting/jitsi-nonprod.yaml](grafana/alerting/jitsi-nonprod.yaml) | same 14 rules as Media-nonprod; error-log spike on namespace `jitsi`; HPA rule covers JVB (4-20) and Jibri (4-10). Added 2026-10-12, not deployed yet |
+| Platform-nonprod | [grafana/alerting/platform-nonprod.yaml](grafana/alerting/platform-nonprod.yaml) | same as Media-nonprod **without** "HPA at max" (19 of 44 nonprod HPAs sit at max permanently: capped at 2, or min = max); error-log spike on `aauti-<app>-<env>`. Added 2026-10-12, not deployed yet |
+| Aauti-hub | [grafana/alerting/aauti-hub.yaml](grafana/alerting/aauti-hub.yaml) | hub volume > 75% for 15m (warning), > 90% for 5m (critical); namespaces `observability` and `grafana`. Deployed 2026-10-12 |
 
 - Notifications go by **email (Outlook)**. `deploy.ps1` loads `grafana/alerting/*.yaml` into ConfigMap
   `grafana-alerting-rules`, and renders the email contact point `email-nonprod` plus the notification policy

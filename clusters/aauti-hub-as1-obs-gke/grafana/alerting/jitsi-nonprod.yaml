@@ -1,0 +1,362 @@
+# Grafana-managed alert rules for aauti-jitsi-nonprod-gke (tenant "jitsi-nonprod").
+# Provisioned by ../deploy.ps1 (ConfigMap grafana-alerting-rules, mounted into
+# /etc/grafana/provisioning/alerting). Edit here, then run deploy.ps1; rules
+# are read-only in the Grafana UI.
+#
+# - Every query is pinned to cluster="aauti-jitsi-nonprod-gke", and every
+#   alert carries environment / namespace (plus pod / container / node where
+#   it applies), so a notification says exactly where the problem is.
+# - Labels: severity (critical | warning), tenant, cluster. Routing is in the
+#   notification policy (grafana-alerting-notify, rendered by deploy.ps1).
+# - Annotations use {{ .Labels.x }} / {{ .Value }} rather than the dollar-sign
+#   aliases, so the files never contain a dollar sign (provisioning would treat
+#   it as an environment variable). Keep it that way when adding rules.
+# - Same rules as media-nonprod.yaml. Logs-based rules watch namespace "jitsi"
+#   (web, prosody, jicofo, jvb, jibri); one Jitsi serves dev / qa / demo /
+#   sandbox, so environment comes from the room name in the log line, and
+#   pods / nodes / metrics are environment "shared".
+# - HPA rule: jitsi-jitsi-meet-jvb-hpa (4-20) and jitsi-jitsi-meet-jibri-hpa
+#   (4-10); at max means no more bridges / recorders can be added.
+# - No generic "target down" rule; agent health is covered by "metrics
+#   stopped" / "logs stopped".
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: Jitsi-nonprod
+    folder: Alerts
+    interval: 1m
+    rules:
+      # ------------------------------------------------------------------
+      # Workloads
+      # ------------------------------------------------------------------
+      - uid: jitsi-np-pod-crashloop
+        title: Pod crash looping
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: max by (environment, namespace, pod, container) (kube_pod_container_status_waiting_reason{cluster="aauti-jitsi-nonprod-gke", reason="CrashLoopBackOff"})
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels: { severity: warning, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "{{ .Labels.namespace }}/{{ .Labels.pod }} ({{ .Labels.container }}) is in CrashLoopBackOff"
+          description: "Container keeps crashing in environment {{ .Labels.environment }}. Check its logs in Grafana (Explore: Loki, cluster aauti-jitsi-nonprod-gke) and the last termination reason."
+
+      - uid: jitsi-np-image-pull
+        title: Image pull failing
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: max by (environment, namespace, pod, container, reason) (kube_pod_container_status_waiting_reason{cluster="aauti-jitsi-nonprod-gke", reason=~"ImagePullBackOff|ErrImagePull|InvalidImageName"})
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        labels: { severity: warning, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "{{ .Labels.namespace }}/{{ .Labels.pod }} cannot pull its image ({{ .Labels.reason }})"
+          description: "Wrong tag, missing image or registry permissions, environment {{ .Labels.environment }}."
+
+      - uid: jitsi-np-oomkilled
+        title: Container OOMKilled
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 1800, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum by (environment, namespace, pod, container) (increase(kube_pod_container_status_restarts_total{cluster="aauti-jitsi-nonprod-gke"}[15m]))
+                and on (namespace, pod, container)
+                max by (namespace, pod, container) (kube_pod_container_status_last_terminated_reason{cluster="aauti-jitsi-nonprod-gke", reason="OOMKilled"}) == 1
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels: { severity: warning, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "{{ .Labels.namespace }}/{{ .Labels.pod }} ({{ .Labels.container }}) was OOMKilled"
+          description: "The container hit its memory limit and was restarted, environment {{ .Labels.environment }}. Raise the limit or fix the leak."
+
+      - uid: jitsi-np-frequent-restarts
+        title: Container restarting frequently
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 3600, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: sum by (environment, namespace, pod, container) (increase(kube_pod_container_status_restarts_total{cluster="aauti-jitsi-nonprod-gke"}[1h]))
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [3] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels: { severity: warning, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "{{ .Labels.namespace }}/{{ .Labels.pod }} ({{ .Labels.container }}) restarted {{ .Value }} times in 1h"
+          description: "More than 3 restarts in the last hour, environment {{ .Labels.environment }}."
+
+      - uid: jitsi-np-deployment-unavailable
+        title: Deployment replicas unavailable
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: max by (environment, namespace, deployment) (kube_deployment_status_replicas_unavailable{cluster="aauti-jitsi-nonprod-gke"})
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 15m
+        labels: { severity: warning, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "{{ .Labels.namespace }}/{{ .Labels.deployment }} has {{ .Value }} unavailable replica(s)"
+          description: "Unavailable for 15 minutes in environment {{ .Labels.environment }} (failed rollout, crashing pods or no capacity)."
+
+      - uid: jitsi-np-pod-not-running
+        title: Pod stuck Pending or Unknown
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: max by (environment, namespace, pod, phase) (kube_pod_status_phase{cluster="aauti-jitsi-nonprod-gke", phase=~"Pending|Unknown"})
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 15m
+        labels: { severity: warning, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "{{ .Labels.namespace }}/{{ .Labels.pod }} has been {{ .Labels.phase }} for 15m"
+          description: "Usually unschedulable (CPU / memory requests, node pool max size) or a volume that can't attach. Environment {{ .Labels.environment }}."
+
+      - uid: jitsi-np-hpa-maxed
+        title: HPA at max replicas
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                max by (environment, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster="aauti-jitsi-nonprod-gke"})
+                >= on (namespace, horizontalpodautoscaler)
+                max by (namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster="aauti-jitsi-nonprod-gke"})
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 15m
+        labels: { severity: warning, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "{{ .Labels.namespace }}/{{ .Labels.horizontalpodautoscaler }} is pinned at its max replicas"
+          description: "The autoscaler can't add more pods (at maxReplicas for 15m), environment {{ .Labels.environment }}."
+
+      - uid: jitsi-np-memory-near-limit
+        title: Container memory near limit
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                max by (environment, namespace, pod, container) (container_memory_working_set_bytes{cluster="aauti-jitsi-nonprod-gke", container!="", container!="POD"})
+                / on (namespace, pod, container)
+                max by (namespace, pod, container) (kube_pod_container_resource_limits{cluster="aauti-jitsi-nonprod-gke", resource="memory"})
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0.9] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 15m
+        labels: { severity: warning, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "{{ .Labels.namespace }}/{{ .Labels.pod }} ({{ .Labels.container }}) uses {{ humanizePercentage .Value }} of its memory limit"
+          description: "Above 90% for 15 minutes; an OOMKill is likely next. Environment {{ .Labels.environment }}."
+
+      - uid: jitsi-np-pvc-almost-full
+        title: Persistent volume almost full
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                max by (environment, namespace, persistentvolumeclaim) (kubelet_volume_stats_used_bytes{cluster="aauti-jitsi-nonprod-gke"})
+                / on (namespace, persistentvolumeclaim)
+                max by (namespace, persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{cluster="aauti-jitsi-nonprod-gke"})
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0.85] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        labels: { severity: warning, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "PVC {{ .Labels.namespace }}/{{ .Labels.persistentvolumeclaim }} is {{ humanizePercentage .Value }} full"
+          description: "Above 85%. Expand the volume or clean up, environment {{ .Labels.environment }}."
+
+      # ------------------------------------------------------------------
+      # Nodes
+      # ------------------------------------------------------------------
+      - uid: jitsi-np-node-not-ready
+        title: Node not ready
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: max by (node) (kube_node_status_condition{cluster="aauti-jitsi-nonprod-gke", condition="Ready", status="true"})
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: lt, params: [1] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels: { severity: critical, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "Node {{ .Labels.node }} is NotReady"
+          description: "Pods on this node are not being served. Check the node in GKE (aauti-jitsi-noprod, aauti-jitsi-nonprod-gke)."
+
+      - uid: jitsi-np-node-pressure
+        title: Node under resource pressure
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: max by (node, condition) (kube_node_status_condition{cluster="aauti-jitsi-nonprod-gke", condition=~"MemoryPressure|DiskPressure|PIDPressure", status="true"})
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels: { severity: warning, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "Node {{ .Labels.node }} reports {{ .Labels.condition }}"
+          description: "The kubelet will start evicting pods from this node."
+
+      # ------------------------------------------------------------------
+      # Logs
+      # ------------------------------------------------------------------
+      - uid: jitsi-np-error-logs
+        title: Error log spike
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: loki
+            relativeTimeRange: { from: 300, to: 0 }
+            queryType: instant
+            model:
+              refId: A
+              queryType: instant
+              expr: sum by (environment, namespace) (count_over_time({cluster="aauti-jitsi-nonprod-gke", namespace="jitsi"} | detected_level=~"error|fatal|critical" [5m]))
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [50] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        labels: { severity: warning, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "{{ .Labels.namespace }} logged {{ .Value }} error lines in 5m"
+          description: "More than 50 error/fatal lines per 5 minutes for 10 minutes, environment {{ .Labels.environment }}. Baseline 2026-10-09..12: at most 3 error-level lines per 5m in namespace jitsi."
+
+      # ------------------------------------------------------------------
+      # Agent / pipeline health (no data reaching the hub)
+      # ------------------------------------------------------------------
+      - uid: jitsi-np-metrics-stopped
+        title: Metrics stopped arriving
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 900, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: absent_over_time(up{cluster="aauti-jitsi-nonprod-gke", job="integrations/kubernetes/kubelet"}[10m])
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels: { severity: critical, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "No metrics from aauti-jitsi-nonprod-gke for 10m"
+          description: "The agent (namespace observability-agent-jitsinonprod) is down or can't reach the hub gateway (network, TLS, password). Run observability-agent/verify.ps1."
+
+      - uid: jitsi-np-logs-stopped
+        title: Logs stopped arriving
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: loki
+            relativeTimeRange: { from: 600, to: 0 }
+            queryType: instant
+            model:
+              refId: A
+              queryType: instant
+              expr: sum(count_over_time({cluster="aauti-jitsi-nonprod-gke"}[10m]))
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: lt, params: [1] } }] }
+        # No result at all means no logs, so "no data" fires too.
+        noDataState: Alerting
+        execErrState: Error
+        for: 5m
+        labels: { severity: critical, tenant: jitsi-nonprod, cluster: aauti-jitsi-nonprod-gke }
+        annotations:
+          summary: "No logs from aauti-jitsi-nonprod-gke for 10m"
+          description: "The agent (namespace observability-agent-jitsinonprod) is down or can't reach the hub gateway (network, TLS, password). Run observability-agent/verify.ps1."
