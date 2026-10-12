@@ -50,7 +50,8 @@ deployed (Media-nonprod 2026-10-08, the rest 2026-10-12; 85 rules). No recipient
 are set, so nothing is sent yet; set them with `grafana/deploy.ps1 -AlertEmails ...`, after giving prod its own contact point
 (today one policy, `email-nonprod`, covers everything). To see them: dashboard **Alerts overview** (folder *Alerts*, next to the rules,
 [source](clusters/aauti-hub-as1-obs-gke/grafana/dashboards/alerts/alerts-overview.json)), counts and firing / pending alerts split
-into prod, nonprod and hub. Rules, status and setup: [hub README → Alerts](clusters/aauti-hub-as1-obs-gke/README.md#alerts).
+into prod, nonprod and hub, with filters Tier → Cluster → Environment → Namespace → Severity (keep Environment / Namespace on *All* to
+also see node, agent and hub alerts). Rules, status and setup: [hub README → Alerts](clusters/aauti-hub-as1-obs-gke/README.md#alerts).
 
 ## Charts
 

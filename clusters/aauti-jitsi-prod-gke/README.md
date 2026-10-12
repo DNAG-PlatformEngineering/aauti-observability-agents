@@ -82,7 +82,7 @@ Then remove `jitsi-prod` from the hub values, the LB ranges and Grafana, and red
 The same four as Jitsi-nonprod (*Cluster health*, *Resource usage*, *Workloads & logs*, *Jitsi Meet*), with the Cluster
 selector limited to tenant `jitsi-prod`. Everything is also in the **Explore** dashboard (Product `jitsi`, Env `prod`).
 
-Alerts: dashboard *Alerts overview* (folder *Alerts*), panels *Prod* (this cluster's group under `aauti-jitsi-prod-gke`), or *Alerting → Alert rules* → group **Jitsi-prod**. Rules: [jitsi-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/jitsi-prod.yaml).
+Alerts: dashboard *Alerts overview* (folder *Alerts*), filter *Tier* = prod, *Cluster* = `aauti-jitsi-prod-gke` (or read the *Prod* panels, grouped by cluster), or *Alerting → Alert rules* → group **Jitsi-prod**. Rules: [jitsi-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/jitsi-prod.yaml).
 
 Raw queries: *Explore* → `Loki` / `Mimir`, e.g. Loki `{product="jitsi", env="prod", namespace="jitsi"}`
 or Mimir `jitsi_participants{cluster="aauti-jitsi-prod-gke"}`.

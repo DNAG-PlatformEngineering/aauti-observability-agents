@@ -8,7 +8,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": false,
   "refresh": "1m",
   "time": {
@@ -17,7 +17,187 @@
   },
   "graphTooltip": 0,
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "tier",
+        "label": "Tier",
+        "type": "custom",
+        "description": "prod / nonprod / hub (the alert's tenant label).",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "query": "prod : .+-prod, nonprod : .+-nonprod, hub : aauti-hub",
+        "options": [
+          {
+            "text": "prod",
+            "value": ".+-prod",
+            "selected": false
+          },
+          {
+            "text": "nonprod",
+            "value": ".+-nonprod",
+            "selected": false
+          },
+          {
+            "text": "hub",
+            "value": "aauti-hub",
+            "selected": false
+          }
+        ],
+        "hide": 0
+      },
+      {
+        "name": "cluster",
+        "label": "Cluster",
+        "type": "query",
+        "description": "Clusters of the selected tier (All = exactly those clusters).",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "mimir"
+        },
+        "query": {
+          "query": "label_values(up{__tenant_id__=~\"${tier:pipe}\"}, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery",
+          "qryType": 1
+        },
+        "definition": "label_values(up{__tenant_id__=~\"${tier:pipe}\"}, cluster)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "regex": "",
+        "hide": 0
+      },
+      {
+        "name": "environment",
+        "label": "Environment",
+        "type": "custom",
+        "description": "Only alerts about a workload carry environment; node / agent / hub alerts have none and show under All only.",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "query": "dev, qa, demo, sandbox, shared, prod",
+        "options": [
+          {
+            "text": "dev",
+            "value": "dev",
+            "selected": false
+          },
+          {
+            "text": "qa",
+            "value": "qa",
+            "selected": false
+          },
+          {
+            "text": "demo",
+            "value": "demo",
+            "selected": false
+          },
+          {
+            "text": "sandbox",
+            "value": "sandbox",
+            "selected": false
+          },
+          {
+            "text": "shared",
+            "value": "shared",
+            "selected": false
+          },
+          {
+            "text": "prod",
+            "value": "prod",
+            "selected": false
+          }
+        ],
+        "hide": 0
+      },
+      {
+        "name": "namespace",
+        "label": "Namespace",
+        "type": "query",
+        "description": "Only workload / PVC alerts carry namespace; node / agent alerts show under All only.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "mimir"
+        },
+        "query": {
+          "query": "label_values(kube_pod_info{cluster=~\"${cluster:pipe}\"}, namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery",
+          "qryType": 1
+        },
+        "definition": "label_values(kube_pod_info{cluster=~\"${cluster:pipe}\"}, namespace)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "regex": "",
+        "hide": 0
+      },
+      {
+        "name": "severity",
+        "label": "Severity",
+        "type": "custom",
+        "description": "Alert severity label.",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "query": "critical, warning",
+        "options": [
+          {
+            "text": "critical",
+            "value": "critical",
+            "selected": false
+          },
+          {
+            "text": "warning",
+            "value": "warning",
+            "selected": false
+          }
+        ],
+        "hide": 0
+      }
+    ]
   },
   "annotations": {
     "list": []
@@ -40,11 +220,11 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 3
+        "h": 4
       },
       "options": {
         "mode": "markdown",
-        "content": "**Alerts overview**: every Grafana-managed alert rule (folder *Alerts*, one rule group per cluster, rules as code in `clusters/aauti-hub-as1-obs-gke/grafana/alerting/`). Lists show only alerts that need attention (firing, pending, no data, error). Expected today: Platform-prod *HPA at max replicas* for `aauti-marketplace` (memory-driven, pinned at 5/5). Email notifications are not set up yet, so this page and *Alerting \u2192 Alert rules* are the only places alerts show."
+        "content": "**Alerts overview**: every Grafana-managed alert rule (folder *Alerts*, one rule group per cluster, rules as code in `clusters/aauti-hub-as1-obs-gke/grafana/alerting/`). Lists show only alerts that need attention (firing, pending, no data, error). Expected today: Platform-prod *HPA at max replicas* for `aauti-marketplace` (memory-driven, pinned at 5/5). Email notifications are not set up yet, so this page and *Alerting \u2192 Alert rules* are the only places alerts show.\n\nFilters at the top work on the alerts' labels. *Environment* and *Namespace* only narrow workload alerts (node, agent and hub alerts have neither label), so leave them on *All* to see everything."
       }
     },
     {
@@ -54,7 +234,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 3,
+        "y": 4,
         "w": 24,
         "h": 1
       },
@@ -67,7 +247,7 @@
       "description": "Alert instances on the prod clusters, by state.",
       "gridPos": {
         "x": 0,
-        "y": 4,
+        "y": 5,
         "w": 8,
         "h": 5
       },
@@ -79,7 +259,7 @@
         "sortOrder": 3,
         "dashboardAlerts": false,
         "alertName": "",
-        "alertInstanceLabelFilter": "{tenant=~\".+-prod\"}",
+        "alertInstanceLabelFilter": "{tenant=~\".+-prod\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
         "datasource": "grafana",
         "stateFilter": {
           "firing": true,
@@ -100,7 +280,7 @@
       "description": "Alert instances on the nonprod clusters, by state.",
       "gridPos": {
         "x": 8,
-        "y": 4,
+        "y": 5,
         "w": 8,
         "h": 5
       },
@@ -112,7 +292,7 @@
         "sortOrder": 3,
         "dashboardAlerts": false,
         "alertName": "",
-        "alertInstanceLabelFilter": "{tenant=~\".+-nonprod\"}",
+        "alertInstanceLabelFilter": "{tenant=~\".+-nonprod\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
         "datasource": "grafana",
         "stateFilter": {
           "firing": true,
@@ -133,7 +313,7 @@
       "description": "The hub's own alerts (volumes filling up).",
       "gridPos": {
         "x": 16,
-        "y": 4,
+        "y": 5,
         "w": 8,
         "h": 5
       },
@@ -145,7 +325,7 @@
         "sortOrder": 3,
         "dashboardAlerts": false,
         "alertName": "",
-        "alertInstanceLabelFilter": "{tenant=\"aauti-hub\"}",
+        "alertInstanceLabelFilter": "{tenant=~\"aauti-hub\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
         "datasource": "grafana",
         "stateFilter": {
           "firing": true,
@@ -166,7 +346,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 9,
+        "y": 10,
         "w": 24,
         "h": 1
       },
@@ -179,7 +359,7 @@
       "description": "Prod alerts that are firing, pending (waiting out their 'for' period), have no data or failed to evaluate. Grouped by cluster.",
       "gridPos": {
         "x": 0,
-        "y": 10,
+        "y": 11,
         "w": 12,
         "h": 12
       },
@@ -193,7 +373,7 @@
         "sortOrder": 3,
         "dashboardAlerts": false,
         "alertName": "",
-        "alertInstanceLabelFilter": "{tenant=~\".+-prod\"}",
+        "alertInstanceLabelFilter": "{tenant=~\".+-prod\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
         "datasource": "grafana",
         "stateFilter": {
           "firing": true,
@@ -214,7 +394,7 @@
       "description": "Same for the nonprod clusters. Grouped by cluster.",
       "gridPos": {
         "x": 12,
-        "y": 10,
+        "y": 11,
         "w": 12,
         "h": 12
       },
@@ -228,7 +408,7 @@
         "sortOrder": 3,
         "dashboardAlerts": false,
         "alertName": "",
-        "alertInstanceLabelFilter": "{tenant=~\".+-nonprod\"}",
+        "alertInstanceLabelFilter": "{tenant=~\".+-nonprod\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
         "datasource": "grafana",
         "stateFilter": {
           "firing": true,
@@ -249,7 +429,7 @@
       "description": "Hub volume alerts (MinIO, Loki, Mimir, Grafana disks over 75% / 90%).",
       "gridPos": {
         "x": 0,
-        "y": 22,
+        "y": 23,
         "w": 12,
         "h": 6
       },
@@ -261,7 +441,7 @@
         "sortOrder": 3,
         "dashboardAlerts": false,
         "alertName": "",
-        "alertInstanceLabelFilter": "{tenant=\"aauti-hub\"}",
+        "alertInstanceLabelFilter": "{tenant=~\"aauti-hub\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
         "datasource": "grafana",
         "stateFilter": {
           "firing": true,
@@ -282,7 +462,7 @@
       "description": "Alerts labelled severity=critical: node NotReady, metrics / logs stopped arriving, hub volume over 90%.",
       "gridPos": {
         "x": 12,
-        "y": 22,
+        "y": 23,
         "w": 12,
         "h": 6
       },
@@ -296,7 +476,7 @@
         "sortOrder": 3,
         "dashboardAlerts": false,
         "alertName": "",
-        "alertInstanceLabelFilter": "{severity=\"critical\"}",
+        "alertInstanceLabelFilter": "{tenant=~\"${tier:pipe}\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=\"critical\"}",
         "datasource": "grafana",
         "stateFilter": {
           "firing": true,

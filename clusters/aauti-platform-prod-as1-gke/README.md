@@ -83,7 +83,7 @@ The *Nodes* row of *Resource usage* stays empty: it needs node-exporter, which t
 
 Everything is also in the **Explore** dashboard (folder *Explore*; Product / Env / Cluster / Namespace / App selectors).
 
-Alerts: dashboard *Alerts overview* (folder *Alerts*), panels *Prod* (this cluster's group under `aauti-platform-prod-as1-gke`), or *Alerting → Alert rules* → group **Platform-prod**. Rules: [platform-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/platform-prod.yaml).
+Alerts: dashboard *Alerts overview* (folder *Alerts*), filter *Tier* = prod, *Cluster* = `aauti-platform-prod-as1-gke` (or read the *Prod* panels, grouped by cluster), or *Alerting → Alert rules* → group **Platform-prod**. Rules: [platform-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/platform-prod.yaml).
 
 Raw queries: *Explore* → `Loki` / `Mimir` (all tenants), e.g. Loki `{product="platform", env="prod"}` or `{cluster="aauti-platform-prod-as1-gke", namespace="aauti-api"}`
 or Mimir `kube_deployment_status_replicas_unavailable{cluster="aauti-platform-prod-as1-gke"}`.

@@ -124,6 +124,8 @@ Grafana-managed rules as code, folder **Alerts**, one rule group per cluster.
 Dashboard **Alerts overview** (folder *Alerts*, next to the rules, [source](grafana/dashboards/alerts/alerts-overview.json)): counts per state for
 prod / nonprod / hub, then everything firing, pending, no data or erroring, grouped by cluster, plus a critical-only list.
 It reads the rules directly (built-in *Alert list* panels split by the `tenant` / `severity` labels), so new rule groups show up without editing it.
+Filters: Tier (prod / nonprod / hub) → Cluster → Environment → Namespace → Severity, matched against the alerts' labels.
+Environment and Namespace only narrow workload alerts (node, agent and hub alerts carry neither), so keep them on *All* to see everything.
 
 **Status (2026-10-12):** all 7 groups are deployed (Media-nonprod since 2026-10-08, the rest 2026-10-12): 85 rules,
 all healthy. The only alert is Platform-prod's "HPA at max replicas" for `aauti-marketplace` (expected, see the table);

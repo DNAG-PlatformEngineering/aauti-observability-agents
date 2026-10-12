@@ -111,7 +111,7 @@ by all environments of a cluster.
   - Prosody: sessions, token auth
   - `jitsi` namespace logs
 
-Alerts: dashboard *Alerts overview* (folder *Alerts*), panels *Nonprod* (this cluster's group under `aauti-jitsi-nonprod-gke`), or *Alerting → Alert rules* → group **Jitsi-nonprod**. Rules: [jitsi-nonprod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/jitsi-nonprod.yaml).
+Alerts: dashboard *Alerts overview* (folder *Alerts*), filter *Tier* = nonprod, *Cluster* = `aauti-jitsi-nonprod-gke` (or read the *Nonprod* panels, grouped by cluster), or *Alerting → Alert rules* → group **Jitsi-nonprod**. Rules: [jitsi-nonprod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/jitsi-nonprod.yaml).
 
 Raw queries: *Explore* → `Loki` / `Mimir` (all tenants), e.g. Loki `{product="jitsi", cluster="aauti-jitsi-nonprod-gke"}` or `{cluster="aauti-jitsi-nonprod-gke", namespace="jitsi"}`
 or Mimir `jitsi_participants{tier="nonprod"}`. The **Explore** dashboard (folder *Explore*; Product / Env / Cluster /
