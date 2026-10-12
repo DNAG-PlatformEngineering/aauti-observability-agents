@@ -1,0 +1,74 @@
+# Grafana-managed alert rules for the hub itself, aauti-hub-as1-obs-gke
+# (tenant "aauti-hub", its own Alloy). Provisioned by ../deploy.ps1 like the
+# other files in this folder; rules are read-only in the Grafana UI.
+#
+# - Hub volumes (namespaces observability and grafana): MinIO holds every
+#   tenant's stored logs and metrics, so a full disk stops ingest for all
+#   clusters. Retention bounds the size by time, not bytes: a log storm, a
+#   stuck compactor or failing uploads to MinIO can still fill it.
+# - What to do when it fires: the storage class (standard-rwo) allows volume
+#   expansion, so raise the size in ../../observability/values.yaml (or
+#   ../values.yaml for Grafana) and redeploy; or shorten the retention of the
+#   biggest tenant. Never delete a PVC to free space (reclaim policy Delete
+#   deletes the disk and its data).
+# - Same conventions as media-nonprod.yaml: every query is pinned to the hub
+#   cluster, annotations use {{ .Labels.x }} / {{ .Value }} (no dollar signs).
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: Aauti-hub
+    folder: Alerts
+    interval: 1m
+    rules:
+      # ------------------------------------------------------------------
+      # Storage
+      # ------------------------------------------------------------------
+      - uid: aauti-hub-pvc-filling
+        title: Hub volume filling up
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                max by (namespace, persistentvolumeclaim) (kubelet_volume_stats_used_bytes{cluster="aauti-hub-as1-obs-gke", namespace=~"observability|grafana"})
+                / on (namespace, persistentvolumeclaim)
+                max by (namespace, persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{cluster="aauti-hub-as1-obs-gke", namespace=~"observability|grafana"})
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0.75] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 15m
+        labels: { severity: warning, tenant: aauti-hub, cluster: aauti-hub-as1-obs-gke }
+        annotations:
+          summary: "Hub volume {{ .Labels.namespace }}/{{ .Labels.persistentvolumeclaim }} is {{ humanizePercentage .Value }} full"
+          description: "Above 75% for 15 minutes. Plan to expand it (raise the size in the hub values and redeploy) or shorten the biggest tenant's retention. Baseline on 2026-10-12: every hub volume under 7%."
+
+      - uid: aauti-hub-pvc-almost-full
+        title: Hub volume almost full
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: mimir
+            relativeTimeRange: { from: 600, to: 0 }
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                max by (namespace, persistentvolumeclaim) (kubelet_volume_stats_used_bytes{cluster="aauti-hub-as1-obs-gke", namespace=~"observability|grafana"})
+                / on (namespace, persistentvolumeclaim)
+                max by (namespace, persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{cluster="aauti-hub-as1-obs-gke", namespace=~"observability|grafana"})
+          - refId: C
+            datasourceUid: __expr__
+            model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0.9] } }] }
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels: { severity: critical, tenant: aauti-hub, cluster: aauti-hub-as1-obs-gke }
+        annotations:
+          summary: "Hub volume {{ .Labels.namespace }}/{{ .Labels.persistentvolumeclaim }} is {{ humanizePercentage .Value }} full"
+          description: "Above 90%. When it reaches 100% Loki / Mimir stop accepting data from every cluster. Expand the volume now (hub values, redeploy)."

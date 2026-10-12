@@ -129,6 +129,7 @@ notifications go nowhere until `./grafana/deploy.ps1 -AlertEmails ... -SmtpUser 
 | Group | File | Rules |
 |---|---|---|
 | Media-nonprod | [grafana/alerting/media-nonprod.yaml](grafana/alerting/media-nonprod.yaml) | crash loop, image pull, OOMKilled, frequent restarts, deployment unavailable, pod Pending/Unknown, HPA at max, memory > 90% of limit, PVC > 85%, node NotReady (critical), node pressure, error-log spike, metrics / logs stopped (critical) |
+| Aauti-hub | [grafana/alerting/aauti-hub.yaml](grafana/alerting/aauti-hub.yaml) | hub volume > 75% for 15m (warning), > 90% for 5m (critical); namespaces `observability` and `grafana`. Added 2026-10-12, not deployed yet |
 
 - Notifications go by **email (Outlook)**. `deploy.ps1` loads `grafana/alerting/*.yaml` into ConfigMap
   `grafana-alerting-rules`, and renders the email contact point `email-nonprod` plus the notification policy
