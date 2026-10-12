@@ -16,7 +16,7 @@ First **prod spoke** of the hub observability stack, onboarded like
 | Agent namespace / Helm release | `observability-agent-mediaprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-media-prod-as1-gke`, `tier=prod`, `product=media`, `environment=prod` (single-environment cluster, so every namespace and the nodes), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). `env` = same value as `environment` (since 2026-10-06) |
 | Retention | logs and metrics 30d (tenant `media-prod`) |
-| Status | **Deployed** 2026-10-06 (hub, Grafana and agent; all `verify.ps1` checks pass). Grafana folder **Media-prod**. No alert rules yet. On first start the agent replays pod logs from before Loki's 7-day reject window; Loki rejects those (HTTP 400 "timestamp too old") for ~2 minutes; `verify.ps1` passes once they leave its 10-minute window (~12 minutes after install). |
+| Status | **Deployed** 2026-10-06 (hub, Grafana and agent; all `verify.ps1` checks pass). Grafana folder **Media-prod**. Alert rules ([media-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/media-prod.yaml), 14 rules) written 2026-10-12, not deployed yet. On first start the agent replays pod logs from before Loki's 7-day reject window; Loki rejects those (HTTP 400 "timestamp too old") for ~2 minutes; `verify.ps1` passes once they leave its 10-minute window (~12 minutes after install). |
 
 ## Differences from media-nonprod
 

@@ -16,7 +16,7 @@ Platform **prod spoke** of the hub observability stack, onboarded like
 | Agent namespace / Helm release | `observability-agent-platformprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-platform-prod-as1-gke`, `tier=prod`, `product=platform`, `environment=prod` (single-environment cluster, so every namespace and the nodes), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). `env` = same value as `environment` |
 | Retention | logs and metrics 30d (tenant `platform-prod`) |
-| Status | **Deployed** 2026-10-08 (verify.ps1: everything passes except the gateway status-code check, whose 400s were the one-time first-start backfill of log lines older than 7 days, rejected by Loki). No alert rules. |
+| Status | **Deployed** 2026-10-08 (verify.ps1: everything passes except the gateway status-code check, whose 400s were the one-time first-start backfill of log lines older than 7 days, rejected by Loki). Alert rules ([platform-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/platform-prod.yaml), 14 rules) written 2026-10-12, not deployed yet; its "HPA at max" rule will fire for `aauti-marketplace` (at 5/5 replicas 84% of the time, driven by its 70% memory target on a 512Mi request). |
 
 ## Differences from media-prod
 

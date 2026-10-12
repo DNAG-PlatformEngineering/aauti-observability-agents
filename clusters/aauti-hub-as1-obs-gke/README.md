@@ -122,15 +122,21 @@ within 5 minutes, instead of carrying on against whatever kube context was curre
 
 Grafana-managed rules as code, folder **Alerts**, one rule group per cluster.
 
-**Status: deployed 2026-10-08, without recipients.** The rules are loaded, but no `-AlertEmails` were passed, so
-notifications go nowhere until `./grafana/deploy.ps1 -AlertEmails ... -SmtpUser ...` is run once. No rules for the prod clusters yet.
-
+**Status (2026-10-12):** Media-nonprod (since 2026-10-08), Jitsi-nonprod, Platform-nonprod and Aauti-hub are deployed:
+43 rules, all healthy, none firing. The three prod groups are written but not deployed yet (the next `grafana/deploy.ps1`
+loads them; Platform-prod's `aauti-marketplace` HPA rule will fire straight away, see the table). No `-AlertEmails` were
+passed, so notifications go nowhere until `./grafana/deploy.ps1 -AlertEmails ... -SmtpUser ...` is run once.
+All prod and nonprod alerts share one notification policy (contact point `email-nonprod`); give prod its own contact point
+before turning email on.
 
 | Group | File | Rules |
 |---|---|---|
 | Media-nonprod | [grafana/alerting/media-nonprod.yaml](grafana/alerting/media-nonprod.yaml) | crash loop, image pull, OOMKilled, frequent restarts, deployment unavailable, pod Pending/Unknown, HPA at max, memory > 90% of limit, PVC > 85%, node NotReady (critical), node pressure, error-log spike, metrics / logs stopped (critical) |
-| Jitsi-nonprod | [grafana/alerting/jitsi-nonprod.yaml](grafana/alerting/jitsi-nonprod.yaml) | same 14 rules as Media-nonprod; error-log spike on namespace `jitsi`; HPA rule covers JVB (4-20) and Jibri (4-10). Added 2026-10-12, not deployed yet |
-| Platform-nonprod | [grafana/alerting/platform-nonprod.yaml](grafana/alerting/platform-nonprod.yaml) | same as Media-nonprod **without** "HPA at max" (19 of 44 nonprod HPAs sit at max permanently: capped at 2, or min = max); error-log spike on `aauti-<app>-<env>`. Added 2026-10-12, not deployed yet |
+| Jitsi-nonprod | [grafana/alerting/jitsi-nonprod.yaml](grafana/alerting/jitsi-nonprod.yaml) | same 14 rules as Media-nonprod; error-log spike on namespace `jitsi`; HPA rule covers JVB (4-20) and Jibri (4-10). Deployed 2026-10-12 |
+| Platform-nonprod | [grafana/alerting/platform-nonprod.yaml](grafana/alerting/platform-nonprod.yaml) | same as Media-nonprod **without** "HPA at max" (19 of 44 nonprod HPAs sit at max permanently: capped at 2, or min = max); error-log spike on `aauti-<app>-<env>`. Deployed 2026-10-12 |
+| Media-prod | [grafana/alerting/media-prod.yaml](grafana/alerting/media-prod.yaml) | same 14 rules as Media-nonprod; HPA rule skips HPAs with min = max. Added 2026-10-12, not deployed yet |
+| Jitsi-prod | [grafana/alerting/jitsi-prod.yaml](grafana/alerting/jitsi-prod.yaml) | same 14 rules; error-log spike on namespace `jitsi`; HPA rule covers JVB (2-20) and Jibri (2-10). Added 2026-10-12, not deployed yet |
+| Platform-prod | [grafana/alerting/platform-prod.yaml](grafana/alerting/platform-prod.yaml) | same 14 rules; HPA rule skips min = max (aauti-scheduler). `aauti-marketplace` fires on it: pinned at 5/5 by its memory target (70% of a 512Mi request). Added 2026-10-12, not deployed yet |
 | Aauti-hub | [grafana/alerting/aauti-hub.yaml](grafana/alerting/aauti-hub.yaml) | hub volume > 75% for 15m (warning), > 90% for 5m (critical); namespaces `observability` and `grafana`. Deployed 2026-10-12 |
 
 - Notifications go by **email (Outlook)**. `deploy.ps1` loads `grafana/alerting/*.yaml` into ConfigMap
@@ -146,6 +152,10 @@ notifications go nowhere until `./grafana/deploy.ps1 -AlertEmails ... -SmtpUser 
   password; or `$env:ALERT_EMAILS` / `SMTP_USER` / `SMTP_PASSWORD`); later runs keep the stored values.
   Grafana restarts (~1 min) whenever the recipients or the SMTP login are created or changed, since the SMTP
   login is only read at start-up. A different `-SmtpUser` than the stored one always prompts for its password.
+- The *Alert rules* page shows a red "Errors loading rules … 404 from rule state endpoint. Perhaps ruler API is not
+  enabled?" banner. Expected and harmless: Grafana also asks the `Mimir` datasource for data source-managed rules,
+  and Mimir's ruler isn't served through the gateway. All rules here are Grafana-managed. (`manageAlerts: false` on
+  the datasources would hide it; deliberately not set.)
   Without recipients the rules still load but nothing is sent.
 - Provisioned rules are read-only in the UI. To add a cluster, copy `media-nonprod.yaml` and change the
   `cluster` matcher, group name, `uid` prefix, the `tenant` label on every rule, the namespace filter of the

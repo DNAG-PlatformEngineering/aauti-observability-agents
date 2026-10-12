@@ -45,8 +45,10 @@ Product → Env → Cluster → Namespace → App → Pod → Container (+ a sea
 before it; panels: log volume, log levels, logs, CPU / memory by pod, restarts, pods not ready, Kubernetes warning events.
 
 **Alerts:** Grafana-managed rules as code in [`grafana/alerting/`](clusters/aauti-hub-as1-obs-gke/grafana/alerting/),
-one file per cluster, sent by email (Outlook SMTP). Only Media-nonprod has rules so far. They were **deployed 2026-10-08 without recipients**, so nothing is sent yet;
-set them with `grafana/deploy.ps1 -AlertEmails ...`. Setup and recipients: [hub README → Alerts](clusters/aauti-hub-as1-obs-gke/README.md#alerts).
+one file per cluster plus one for the hub's own volumes, sent by email (Outlook SMTP). All 3 nonprod clusters and the hub
+are deployed (2026-10-08 / 2026-10-12); the 3 prod clusters' rules are written (2026-10-12) but not deployed yet. No recipients
+are set, so nothing is sent yet; set them with `grafana/deploy.ps1 -AlertEmails ...`, after giving prod its own contact point
+(today one policy, `email-nonprod`, covers everything). Rules, status and setup: [hub README → Alerts](clusters/aauti-hub-as1-obs-gke/README.md#alerts).
 
 ## Charts
 

@@ -10,7 +10,7 @@ clusters are onboarded the same way (see [Standard](#standard-for-the-next-clust
 | VPC | `aauti-jitsi-nonprod-vpc`: nodes 10.16.0.0/24, pods 10.17.0.0/17, services 10.18.0.0/22 |
 | Hub | `aauti-hub-as1-obs-gke`, tenant **`jitsi-nonprod`** (was `jitsi` until 2026-10-06), Grafana https://grafana.aauti.ai (folder **Jitsi-nonprod**) |
 | Labels on all data | `cluster=aauti-jitsi-nonprod-gke`, `tier=nonprod`, `product=jitsi`, `environment`, `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). **environment:** one Jitsi (`devvideo.aauti.com`) serves **dev, qa, demo and sandbox**, chosen per meeting by the room name (`<title>-<id>-aauti-<env>`, recordings `…-recording-<env>`). Infrastructure (pods, nodes, JVB load, all metrics) = `shared`. Log lines naming a room (web, prosody, jicofo, jvb, jibri `[finalize][<env>]`) = that meeting's env. `env` = same value as `environment` (since 2026-10-06) |
-| Status | **Deployed** 2026-09-30. Grafana folder **Jitsi-nonprod**. No alert rules yet. |
+| Status | **Deployed** 2026-09-30. Grafana folder **Jitsi-nonprod**. Alert rules ([jitsi-nonprod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/jitsi-nonprod.yaml), 14 rules) deployed 2026-10-12; no recipients yet, so nothing is sent. |
 | Agent namespace / Helm release | `observability-agent-jitsinonprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. Renamed from `observability-agent` on 2026-10-01. |
 
 ## What gets deployed
@@ -146,4 +146,9 @@ For each new cluster:
 4. **Roll out** in the same order: network → hub → Grafana → agent → `verify.ps1`.
    On a cluster whose pods are older than 7 days, the agent's first minutes replay old pod logs that Loki rejects
    (HTTP 400 "timestamp too old"); the gateway status check fails until those leave its 10-minute window, so run `verify.ps1` ~10-12 minutes after the agent install.
-5. **Docs.** Add the cluster to the tables in the root `README.md` and the hub README.
+5. **Alerts.** Copy `../aauti-hub-as1-obs-gke/grafana/alerting/media-nonprod.yaml` (nonprod) or `media-prod.yaml`
+   (prod; its HPA rule skips min = max) to `<tenant>.yaml`, then change the `cluster` matcher, `tenant` label, group
+   name, `uid` prefix, agent namespace and the namespaces of the error-log rule. Run each query in Explore first: drop
+   any rule that would fire permanently (e.g. "HPA at max" on platform-nonprod) and note why in the file header.
+   Load it with `grafana/deploy.ps1`.
+6. **Docs.** Add the cluster to the tables in the root `README.md` and the hub README (including its Alerts table).
