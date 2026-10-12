@@ -218,6 +218,17 @@ dashboardProviders:
         allowUiUpdates: false
         options:
           path: /var/lib/grafana/dashboards/explore
+      # Alerts overview (grafana/dashboards/alerts/*.json), in the folder "Alerts"
+      # that also holds the alert rules (alerting/*.yaml); matched by title.
+      - name: alerts
+        orgId: 1
+        folder: Alerts
+        type: file
+        disableDeletion: true
+        editable: false
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/alerts
 dashboardsConfigMaps:
   jitsi-nonprod: grafana-dashboards-jitsi-nonprod
   jitsi-prod: grafana-dashboards-jitsi-prod
@@ -226,6 +237,7 @@ dashboardsConfigMaps:
   platform-nonprod: grafana-dashboards-platform-nonprod
   platform-prod: grafana-dashboards-platform-prod
   explore: grafana-dashboards-explore
+  alerts: grafana-dashboards-alerts
 
 # Alerting as code: rule files from alerting/*.yaml (ConfigMap
 # grafana-alerting-rules) plus the email contact point + notification policy

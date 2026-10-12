@@ -48,8 +48,8 @@ before it; panels: log volume, log levels, logs, CPU / memory by pod, restarts, 
 one file per cluster plus one for the hub's own volumes, sent by email (Outlook SMTP). All 6 clusters and the hub are
 deployed (Media-nonprod 2026-10-08, the rest 2026-10-12; 85 rules). No recipients
 are set, so nothing is sent yet; set them with `grafana/deploy.ps1 -AlertEmails ...`, after giving prod its own contact point
-(today one policy, `email-nonprod`, covers everything). To see them: dashboard **Alerts overview** (folder *Explore*,
-[source](clusters/aauti-hub-as1-obs-gke/grafana/dashboards/alerts-overview.json)), counts and firing / pending alerts split
+(today one policy, `email-nonprod`, covers everything). To see them: dashboard **Alerts overview** (folder *Alerts*, next to the rules,
+[source](clusters/aauti-hub-as1-obs-gke/grafana/dashboards/alerts/alerts-overview.json)), counts and firing / pending alerts split
 into prod, nonprod and hub. Rules, status and setup: [hub README → Alerts](clusters/aauti-hub-as1-obs-gke/README.md#alerts).
 
 ## Charts

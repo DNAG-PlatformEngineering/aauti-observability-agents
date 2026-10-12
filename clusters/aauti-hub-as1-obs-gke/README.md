@@ -121,7 +121,7 @@ within 5 minutes, instead of carrying on against whatever kube context was curre
 ## Alerts
 
 Grafana-managed rules as code, folder **Alerts**, one rule group per cluster.
-Dashboard **Alerts overview** (folder *Explore*, [source](grafana/dashboards/alerts-overview.json)): counts per state for
+Dashboard **Alerts overview** (folder *Alerts*, next to the rules, [source](grafana/dashboards/alerts/alerts-overview.json)): counts per state for
 prod / nonprod / hub, then everything firing, pending, no data or erroring, grouped by cluster, plus a critical-only list.
 It reads the rules directly (built-in *Alert list* panels split by the `tenant` / `severity` labels), so new rule groups show up without editing it.
 

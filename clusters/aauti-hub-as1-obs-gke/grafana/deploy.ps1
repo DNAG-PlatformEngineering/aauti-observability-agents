@@ -104,13 +104,23 @@ foreach ($t in $dashboards.Keys) {
 }
 
 # Explore dashboard (folder Explore): dashboards/*.json as is (already on the
-# "Loki" / "Mimir" datasources, all products).
+# "Loki" / "Mimir" datasources, all products). --from-file takes only the files
+# directly in the folder, not dashboards/alerts/.
 $before = kubectl -n $Namespace get configmap grafana-dashboards-explore -o jsonpath="{.metadata.resourceVersion}" 2>$null
 kubectl -n $Namespace create configmap grafana-dashboards-explore --from-file="$PSScriptRoot/dashboards" --dry-run=client -o yaml |
   kubectl apply --server-side --force-conflicts -f -
 if ($LASTEXITCODE -ne 0) { throw "creating grafana-dashboards-explore failed" }
 $after = kubectl -n $Namespace get configmap grafana-dashboards-explore -o jsonpath="{.metadata.resourceVersion}"
 if ($before -and $before -ne $after) { $provisioningChanged = $true }
+
+# Alerts overview (folder Alerts, next to the alert rules): dashboards/alerts/*.json.
+# Must exist before helm upgrade (values.yaml mounts it).
+$before = kubectl -n $Namespace get configmap grafana-dashboards-alerts -o jsonpath="{.metadata.resourceVersion}" 2>$null
+kubectl -n $Namespace create configmap grafana-dashboards-alerts --from-file="$PSScriptRoot/dashboards/alerts" --dry-run=client -o yaml |
+  kubectl apply --server-side --force-conflicts -f -
+if ($LASTEXITCODE -ne 0) { throw "creating grafana-dashboards-alerts failed" }
+$after = kubectl -n $Namespace get configmap grafana-dashboards-alerts -o jsonpath="{.metadata.resourceVersion}"
+if (-not $before -or $before -ne $after) { $provisioningChanged = $true }
 
 # Alert rules: ConfigMap grafana-alerting-rules from alerting/*.yaml.
 $before = kubectl -n $Namespace get configmap grafana-alerting-rules -o jsonpath="{.metadata.resourceVersion}" 2>$null
