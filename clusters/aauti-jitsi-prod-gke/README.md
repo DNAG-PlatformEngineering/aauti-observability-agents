@@ -15,7 +15,7 @@
 | Agent namespace / Helm release | `observability-agent-jitsiprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-jitsi-prod-gke`, `tier=prod`, `product=jitsi`, `environment=prod` / `env=prod` (everything), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs) |
 | Retention | logs and metrics 30d (tenant `jitsi-prod`) |
-| Status | **Deployed** 2026-10-06 (network, hub, Grafana and agent; all `verify.ps1` checks pass). Alert rules ([jitsi-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/jitsi-prod.yaml), 14 rules) written 2026-10-12, not deployed yet. |
+| Status | **Deployed** 2026-10-06 (network, hub, Grafana and agent; all `verify.ps1` checks pass). Alert rules ([jitsi-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/jitsi-prod.yaml), 14 rules) deployed 2026-10-12; no recipients yet, so nothing is sent. |
 
 ## Differences from jitsi-nonprod
 
@@ -81,6 +81,8 @@ Then remove `jitsi-prod` from the hub values, the LB ranges and Grafana, and red
 
 The same four as Jitsi-nonprod (*Cluster health*, *Resource usage*, *Workloads & logs*, *Jitsi Meet*), with the Cluster
 selector limited to tenant `jitsi-prod`. Everything is also in the **Explore** dashboard (Product `jitsi`, Env `prod`).
+
+Alerts: dashboard *Alerts overview* (folder *Explore*), panels *Prod* (this cluster's group under `aauti-jitsi-prod-gke`), or *Alerting → Alert rules* → group **Jitsi-prod**. Rules: [jitsi-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/jitsi-prod.yaml).
 
 Raw queries: *Explore* → `Loki` / `Mimir`, e.g. Loki `{product="jitsi", env="prod", namespace="jitsi"}`
 or Mimir `jitsi_participants{cluster="aauti-jitsi-prod-gke"}`.

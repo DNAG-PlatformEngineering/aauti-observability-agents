@@ -1,0 +1,314 @@
+{
+  "uid": "alerts-overview",
+  "title": "Alerts overview",
+  "description": "State of every Grafana-managed alert rule, split into prod, nonprod and hub.",
+  "tags": [
+    "observability-stack",
+    "alerts"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "1m",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "graphTooltip": 0,
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [
+    {
+      "title": "Alert rules",
+      "type": "link",
+      "url": "/alerting/list",
+      "icon": "bell",
+      "targetBlank": false
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Alerts overview**: every Grafana-managed alert rule (folder *Alerts*, one rule group per cluster, rules as code in `clusters/aauti-hub-as1-obs-gke/grafana/alerting/`). Lists show only alerts that need attention (firing, pending, no data, error). Expected today: Platform-prod *HPA at max replicas* for `aauti-marketplace` (memory-driven, pinned at 5/5). Email notifications are not set up yet, so this page and *Alerting \u2192 Alert rules* are the only places alerts show."
+      }
+    },
+    {
+      "id": 2,
+      "type": "row",
+      "title": "Summary (number of alert instances per state)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 3,
+      "type": "alertlist",
+      "title": "Prod (media, jitsi, platform)",
+      "description": "Alert instances on the prod clusters, by state.",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 8,
+        "h": 5
+      },
+      "options": {
+        "viewMode": "stat",
+        "groupMode": "default",
+        "groupBy": [],
+        "maxItems": 50,
+        "sortOrder": 3,
+        "dashboardAlerts": false,
+        "alertName": "",
+        "alertInstanceLabelFilter": "{tenant=~\".+-prod\"}",
+        "datasource": "grafana",
+        "stateFilter": {
+          "firing": true,
+          "pending": true,
+          "noData": true,
+          "normal": true,
+          "error": true,
+          "recovering": true
+        },
+        "showInstances": true,
+        "folder": null
+      }
+    },
+    {
+      "id": 4,
+      "type": "alertlist",
+      "title": "Nonprod (media, jitsi, platform)",
+      "description": "Alert instances on the nonprod clusters, by state.",
+      "gridPos": {
+        "x": 8,
+        "y": 4,
+        "w": 8,
+        "h": 5
+      },
+      "options": {
+        "viewMode": "stat",
+        "groupMode": "default",
+        "groupBy": [],
+        "maxItems": 50,
+        "sortOrder": 3,
+        "dashboardAlerts": false,
+        "alertName": "",
+        "alertInstanceLabelFilter": "{tenant=~\".+-nonprod\"}",
+        "datasource": "grafana",
+        "stateFilter": {
+          "firing": true,
+          "pending": true,
+          "noData": true,
+          "normal": true,
+          "error": true,
+          "recovering": true
+        },
+        "showInstances": true,
+        "folder": null
+      }
+    },
+    {
+      "id": 5,
+      "type": "alertlist",
+      "title": "Hub (aauti-hub-as1-obs-gke)",
+      "description": "The hub's own alerts (volumes filling up).",
+      "gridPos": {
+        "x": 16,
+        "y": 4,
+        "w": 8,
+        "h": 5
+      },
+      "options": {
+        "viewMode": "stat",
+        "groupMode": "default",
+        "groupBy": [],
+        "maxItems": 50,
+        "sortOrder": 3,
+        "dashboardAlerts": false,
+        "alertName": "",
+        "alertInstanceLabelFilter": "{tenant=\"aauti-hub\"}",
+        "datasource": "grafana",
+        "stateFilter": {
+          "firing": true,
+          "pending": true,
+          "noData": true,
+          "normal": true,
+          "error": true,
+          "recovering": true
+        },
+        "showInstances": true,
+        "folder": null
+      }
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "Needs attention",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "alertlist",
+      "title": "Prod: firing / pending",
+      "description": "Prod alerts that are firing, pending (waiting out their 'for' period), have no data or failed to evaluate. Grouped by cluster.",
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 12
+      },
+      "options": {
+        "viewMode": "list",
+        "groupMode": "custom",
+        "groupBy": [
+          "cluster"
+        ],
+        "maxItems": 50,
+        "sortOrder": 3,
+        "dashboardAlerts": false,
+        "alertName": "",
+        "alertInstanceLabelFilter": "{tenant=~\".+-prod\"}",
+        "datasource": "grafana",
+        "stateFilter": {
+          "firing": true,
+          "pending": true,
+          "noData": true,
+          "normal": false,
+          "error": true,
+          "recovering": true
+        },
+        "showInstances": true,
+        "folder": null
+      }
+    },
+    {
+      "id": 8,
+      "type": "alertlist",
+      "title": "Nonprod: firing / pending",
+      "description": "Same for the nonprod clusters. Grouped by cluster.",
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 12
+      },
+      "options": {
+        "viewMode": "list",
+        "groupMode": "custom",
+        "groupBy": [
+          "cluster"
+        ],
+        "maxItems": 50,
+        "sortOrder": 3,
+        "dashboardAlerts": false,
+        "alertName": "",
+        "alertInstanceLabelFilter": "{tenant=~\".+-nonprod\"}",
+        "datasource": "grafana",
+        "stateFilter": {
+          "firing": true,
+          "pending": true,
+          "noData": true,
+          "normal": false,
+          "error": true,
+          "recovering": true
+        },
+        "showInstances": true,
+        "folder": null
+      }
+    },
+    {
+      "id": 9,
+      "type": "alertlist",
+      "title": "Hub: firing / pending",
+      "description": "Hub volume alerts (MinIO, Loki, Mimir, Grafana disks over 75% / 90%).",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 6
+      },
+      "options": {
+        "viewMode": "list",
+        "groupMode": "default",
+        "groupBy": [],
+        "maxItems": 50,
+        "sortOrder": 3,
+        "dashboardAlerts": false,
+        "alertName": "",
+        "alertInstanceLabelFilter": "{tenant=\"aauti-hub\"}",
+        "datasource": "grafana",
+        "stateFilter": {
+          "firing": true,
+          "pending": true,
+          "noData": true,
+          "normal": false,
+          "error": true,
+          "recovering": true
+        },
+        "showInstances": true,
+        "folder": null
+      }
+    },
+    {
+      "id": 10,
+      "type": "alertlist",
+      "title": "Critical only (all clusters)",
+      "description": "Alerts labelled severity=critical: node NotReady, metrics / logs stopped arriving, hub volume over 90%.",
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 6
+      },
+      "options": {
+        "viewMode": "list",
+        "groupMode": "custom",
+        "groupBy": [
+          "cluster"
+        ],
+        "maxItems": 50,
+        "sortOrder": 3,
+        "dashboardAlerts": false,
+        "alertName": "",
+        "alertInstanceLabelFilter": "{severity=\"critical\"}",
+        "datasource": "grafana",
+        "stateFilter": {
+          "firing": true,
+          "pending": true,
+          "noData": true,
+          "normal": false,
+          "error": true,
+          "recovering": true
+        },
+        "showInstances": true,
+        "folder": null
+      }
+    }
+  ]
+}

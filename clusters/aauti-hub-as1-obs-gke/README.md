@@ -121,10 +121,13 @@ within 5 minutes, instead of carrying on against whatever kube context was curre
 ## Alerts
 
 Grafana-managed rules as code, folder **Alerts**, one rule group per cluster.
+Dashboard **Alerts overview** (folder *Explore*, [source](grafana/dashboards/alerts-overview.json)): counts per state for
+prod / nonprod / hub, then everything firing, pending, no data or erroring, grouped by cluster, plus a critical-only list.
+It reads the rules directly (built-in *Alert list* panels split by the `tenant` / `severity` labels), so new rule groups show up without editing it.
 
-**Status (2026-10-12):** Media-nonprod (since 2026-10-08), Jitsi-nonprod, Platform-nonprod and Aauti-hub are deployed:
-43 rules, all healthy, none firing. The three prod groups are written but not deployed yet (the next `grafana/deploy.ps1`
-loads them; Platform-prod's `aauti-marketplace` HPA rule will fire straight away, see the table). No `-AlertEmails` were
+**Status (2026-10-12):** all 7 groups are deployed (Media-nonprod since 2026-10-08, the rest 2026-10-12): 85 rules,
+all healthy. The only alert is Platform-prod's "HPA at max replicas" for `aauti-marketplace` (expected, see the table);
+everything else is normal. No `-AlertEmails` were
 passed, so notifications go nowhere until `./grafana/deploy.ps1 -AlertEmails ... -SmtpUser ...` is run once.
 All prod and nonprod alerts share one notification policy (contact point `email-nonprod`); give prod its own contact point
 before turning email on.
@@ -134,9 +137,9 @@ before turning email on.
 | Media-nonprod | [grafana/alerting/media-nonprod.yaml](grafana/alerting/media-nonprod.yaml) | crash loop, image pull, OOMKilled, frequent restarts, deployment unavailable, pod Pending/Unknown, HPA at max, memory > 90% of limit, PVC > 85%, node NotReady (critical), node pressure, error-log spike, metrics / logs stopped (critical) |
 | Jitsi-nonprod | [grafana/alerting/jitsi-nonprod.yaml](grafana/alerting/jitsi-nonprod.yaml) | same 14 rules as Media-nonprod; error-log spike on namespace `jitsi`; HPA rule covers JVB (4-20) and Jibri (4-10). Deployed 2026-10-12 |
 | Platform-nonprod | [grafana/alerting/platform-nonprod.yaml](grafana/alerting/platform-nonprod.yaml) | same as Media-nonprod **without** "HPA at max" (19 of 44 nonprod HPAs sit at max permanently: capped at 2, or min = max); error-log spike on `aauti-<app>-<env>`. Deployed 2026-10-12 |
-| Media-prod | [grafana/alerting/media-prod.yaml](grafana/alerting/media-prod.yaml) | same 14 rules as Media-nonprod; HPA rule skips HPAs with min = max. Added 2026-10-12, not deployed yet |
-| Jitsi-prod | [grafana/alerting/jitsi-prod.yaml](grafana/alerting/jitsi-prod.yaml) | same 14 rules; error-log spike on namespace `jitsi`; HPA rule covers JVB (2-20) and Jibri (2-10). Added 2026-10-12, not deployed yet |
-| Platform-prod | [grafana/alerting/platform-prod.yaml](grafana/alerting/platform-prod.yaml) | same 14 rules; HPA rule skips min = max (aauti-scheduler). `aauti-marketplace` fires on it: pinned at 5/5 by its memory target (70% of a 512Mi request). Added 2026-10-12, not deployed yet |
+| Media-prod | [grafana/alerting/media-prod.yaml](grafana/alerting/media-prod.yaml) | same 14 rules as Media-nonprod; HPA rule skips HPAs with min = max. Deployed 2026-10-12 |
+| Jitsi-prod | [grafana/alerting/jitsi-prod.yaml](grafana/alerting/jitsi-prod.yaml) | same 14 rules; error-log spike on namespace `jitsi`; HPA rule covers JVB (2-20) and Jibri (2-10). Deployed 2026-10-12 |
+| Platform-prod | [grafana/alerting/platform-prod.yaml](grafana/alerting/platform-prod.yaml) | same 14 rules; HPA rule skips min = max (aauti-scheduler). `aauti-marketplace` fires on it: pinned at 5/5 by its memory target (70% of a 512Mi request). Deployed 2026-10-12 |
 | Aauti-hub | [grafana/alerting/aauti-hub.yaml](grafana/alerting/aauti-hub.yaml) | hub volume > 75% for 15m (warning), > 90% for 5m (critical); namespaces `observability` and `grafana`. Deployed 2026-10-12 |
 
 - Notifications go by **email (Outlook)**. `deploy.ps1` loads `grafana/alerting/*.yaml` into ConfigMap

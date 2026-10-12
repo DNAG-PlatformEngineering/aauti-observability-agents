@@ -81,5 +81,7 @@ The *Nodes* row of *Resource usage* stays empty: it needs node-exporter, which t
 
 Everything is also in the **Explore** dashboard (folder *Explore*; Product / Env / Cluster / Namespace / App selectors).
 
+Alerts: dashboard *Alerts overview* (folder *Explore*), panels *Nonprod* (this cluster's group under `aauti-media-nonprod-as1-gke`), or *Alerting → Alert rules* → group **Media-nonprod**. Rules: [media-nonprod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/media-nonprod.yaml).
+
 Raw queries: *Explore* → `Loki` / `Mimir` (all tenants), e.g. Loki `{product="media", cluster="aauti-media-nonprod-as1-gke"}` or `{cluster="aauti-media-nonprod-as1-gke", environment="qa"}`
 or Mimir `kube_pod_container_status_restarts_total{cluster="aauti-media-nonprod-as1-gke"}`.
