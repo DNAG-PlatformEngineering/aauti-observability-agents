@@ -8,7 +8,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 4,
   "editable": false,
   "refresh": "1m",
   "time": {
@@ -208,7 +208,8 @@
       "type": "link",
       "url": "/alerting/list",
       "icon": "bell",
-      "targetBlank": false
+      "targetBlank": false,
+      "tooltip": "All alert rules (Alerting -> Alert rules)"
     }
   ],
   "panels": [
@@ -224,13 +225,13 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Alerts overview**: every Grafana-managed alert rule (folder *Alerts*, one rule group per cluster, rules as code in `clusters/aauti-hub-as1-obs-gke/grafana/alerting/`). Lists show only alerts that need attention (firing, pending, no data, error). Expected today: Platform-prod *HPA at max replicas* for `aauti-marketplace` (memory-driven, pinned at 5/5). Email notifications are not set up yet, so this page and *Alerting \u2192 Alert rules* are the only places alerts show.\n\nFilters at the top work on the alerts' labels. *Environment* and *Namespace* only narrow workload alerts (node, agent and hub alerts have neither label), so leave them on *All* to see everything."
+        "content": "**Alerts overview**: every Grafana-managed alert rule (folder *Alerts*, one rule group per cluster; rules as code in `clusters/aauti-hub-as1-obs-gke/grafana/alerting/`). **Pick a Tier at the top**: the panels below repeat once per selected tier (prod, nonprod, hub), so *prod* shows only prod, *nonprod* only nonprod, *All* shows all three. *Environment* and *Namespace* only narrow workload alerts (node, agent and hub alerts carry neither), so keep them on *All* to see everything. Email notifications are not set up yet."
       }
     },
     {
       "id": 2,
       "type": "row",
-      "title": "Summary (number of alert instances per state)",
+      "title": "Summary (alert instances per state)",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -243,8 +244,8 @@
     {
       "id": 3,
       "type": "alertlist",
-      "title": "Prod (media, jitsi, platform)",
-      "description": "Alert instances on the prod clusters, by state.",
+      "title": "${tier:text}",
+      "description": "Alert instances of this tier, by state.",
       "gridPos": {
         "x": 0,
         "y": 5,
@@ -259,7 +260,7 @@
         "sortOrder": 3,
         "dashboardAlerts": false,
         "alertName": "",
-        "alertInstanceLabelFilter": "{tenant=~\".+-prod\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
+        "alertInstanceLabelFilter": "{tenant=~\"${tier}\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
         "datasource": "grafana",
         "stateFilter": {
           "firing": true,
@@ -271,73 +272,10 @@
         },
         "showInstances": true,
         "folder": null
-      }
-    },
-    {
-      "id": 4,
-      "type": "alertlist",
-      "title": "Nonprod (media, jitsi, platform)",
-      "description": "Alert instances on the nonprod clusters, by state.",
-      "gridPos": {
-        "x": 8,
-        "y": 5,
-        "w": 8,
-        "h": 5
       },
-      "options": {
-        "viewMode": "stat",
-        "groupMode": "default",
-        "groupBy": [],
-        "maxItems": 50,
-        "sortOrder": 3,
-        "dashboardAlerts": false,
-        "alertName": "",
-        "alertInstanceLabelFilter": "{tenant=~\".+-nonprod\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
-        "datasource": "grafana",
-        "stateFilter": {
-          "firing": true,
-          "pending": true,
-          "noData": true,
-          "normal": true,
-          "error": true,
-          "recovering": true
-        },
-        "showInstances": true,
-        "folder": null
-      }
-    },
-    {
-      "id": 5,
-      "type": "alertlist",
-      "title": "Hub (aauti-hub-as1-obs-gke)",
-      "description": "The hub's own alerts (volumes filling up).",
-      "gridPos": {
-        "x": 16,
-        "y": 5,
-        "w": 8,
-        "h": 5
-      },
-      "options": {
-        "viewMode": "stat",
-        "groupMode": "default",
-        "groupBy": [],
-        "maxItems": 50,
-        "sortOrder": 3,
-        "dashboardAlerts": false,
-        "alertName": "",
-        "alertInstanceLabelFilter": "{tenant=~\"aauti-hub\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
-        "datasource": "grafana",
-        "stateFilter": {
-          "firing": true,
-          "pending": true,
-          "noData": true,
-          "normal": true,
-          "error": true,
-          "recovering": true
-        },
-        "showInstances": true,
-        "folder": null
-      }
+      "repeat": "tier",
+      "repeatDirection": "h",
+      "maxPerRow": 3
     },
     {
       "id": 6,
@@ -355,12 +293,12 @@
     {
       "id": 7,
       "type": "alertlist",
-      "title": "Prod: firing / pending",
-      "description": "Prod alerts that are firing, pending (waiting out their 'for' period), have no data or failed to evaluate. Grouped by cluster.",
+      "title": "${tier:text}: firing / pending",
+      "description": "Alerts of this tier that are firing, pending (waiting out their 'for' period), have no data or failed to evaluate. Grouped by cluster.",
       "gridPos": {
         "x": 0,
         "y": 11,
-        "w": 12,
+        "w": 8,
         "h": 12
       },
       "options": {
@@ -373,7 +311,7 @@
         "sortOrder": 3,
         "dashboardAlerts": false,
         "alertName": "",
-        "alertInstanceLabelFilter": "{tenant=~\".+-prod\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
+        "alertInstanceLabelFilter": "{tenant=~\"${tier}\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
         "datasource": "grafana",
         "stateFilter": {
           "firing": true,
@@ -385,85 +323,20 @@
         },
         "showInstances": true,
         "folder": null
-      }
-    },
-    {
-      "id": 8,
-      "type": "alertlist",
-      "title": "Nonprod: firing / pending",
-      "description": "Same for the nonprod clusters. Grouped by cluster.",
-      "gridPos": {
-        "x": 12,
-        "y": 11,
-        "w": 12,
-        "h": 12
       },
-      "options": {
-        "viewMode": "list",
-        "groupMode": "custom",
-        "groupBy": [
-          "cluster"
-        ],
-        "maxItems": 50,
-        "sortOrder": 3,
-        "dashboardAlerts": false,
-        "alertName": "",
-        "alertInstanceLabelFilter": "{tenant=~\".+-nonprod\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
-        "datasource": "grafana",
-        "stateFilter": {
-          "firing": true,
-          "pending": true,
-          "noData": true,
-          "normal": false,
-          "error": true,
-          "recovering": true
-        },
-        "showInstances": true,
-        "folder": null
-      }
-    },
-    {
-      "id": 9,
-      "type": "alertlist",
-      "title": "Hub: firing / pending",
-      "description": "Hub volume alerts (MinIO, Loki, Mimir, Grafana disks over 75% / 90%).",
-      "gridPos": {
-        "x": 0,
-        "y": 23,
-        "w": 12,
-        "h": 6
-      },
-      "options": {
-        "viewMode": "list",
-        "groupMode": "default",
-        "groupBy": [],
-        "maxItems": 50,
-        "sortOrder": 3,
-        "dashboardAlerts": false,
-        "alertName": "",
-        "alertInstanceLabelFilter": "{tenant=~\"aauti-hub\", cluster=~\"${cluster:pipe}\", environment=~\"${environment:pipe}\", namespace=~\"${namespace:pipe}\", severity=~\"${severity:pipe}\"}",
-        "datasource": "grafana",
-        "stateFilter": {
-          "firing": true,
-          "pending": true,
-          "noData": true,
-          "normal": false,
-          "error": true,
-          "recovering": true
-        },
-        "showInstances": true,
-        "folder": null
-      }
+      "repeat": "tier",
+      "repeatDirection": "h",
+      "maxPerRow": 3
     },
     {
       "id": 10,
       "type": "alertlist",
-      "title": "Critical only (all clusters)",
+      "title": "Critical only (selected tiers)",
       "description": "Alerts labelled severity=critical: node NotReady, metrics / logs stopped arriving, hub volume over 90%.",
       "gridPos": {
-        "x": 12,
+        "x": 0,
         "y": 23,
-        "w": 12,
+        "w": 24,
         "h": 6
       },
       "options": {
@@ -488,6 +361,145 @@
         },
         "showInstances": true,
         "folder": null
+      }
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Jump to a cluster",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 20,
+      "type": "table",
+      "title": "Clusters in the selected tier (click a cluster name for its dashboards and alert rules)",
+      "description": "Live list of the spoke clusters matching Tier and Cluster. The hub has no cluster dashboards; see the link below.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "count by (cluster, tenant) (label_replace(up{__tenant_id__=~\"${tier:pipe}\", __tenant_id__!=\"aauti-hub\", cluster=~\"${cluster:pipe}\"}, \"tenant\", \"$1\", \"__tenant_id__\", \"(.+)\"))",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true
+            },
+            "indexByName": {
+              "cluster": 0,
+              "tenant": 1
+            }
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cluster"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Cluster health",
+                    "url": "/d/${__data.fields.tenant}-cluster-health/x?var-cluster=${__data.fields.cluster}&${__url_time_range}",
+                    "targetBlank": false
+                  },
+                  {
+                    "title": "Workloads & logs",
+                    "url": "/d/${__data.fields.tenant}-workloads-logs/x?var-cluster=${__data.fields.cluster}&${__url_time_range}",
+                    "targetBlank": false
+                  },
+                  {
+                    "title": "Resource usage",
+                    "url": "/d/${__data.fields.tenant}-resource-usage/x?var-cluster=${__data.fields.cluster}&${__url_time_range}",
+                    "targetBlank": false
+                  },
+                  {
+                    "title": "All dashboards of this cluster (incl. Jitsi Meet)",
+                    "url": "/dashboards?tag=${__data.fields.tenant}",
+                    "targetBlank": false
+                  },
+                  {
+                    "title": "Alert rules of this cluster",
+                    "url": "/alerting/list?search=label:cluster%3D${__data.fields.cluster}",
+                    "targetBlank": false
+                  }
+                ]
+              },
+              {
+                "id": "displayName",
+                "value": "Cluster (click)"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tenant"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Tenant"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 21,
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 37,
+        "w": 24,
+        "h": 2
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Hub (`aauti-hub-as1-obs-gke`): [Aauti-hub alert rules](/alerting/list?search=label:cluster%3Daauti-hub-as1-obs-gke) \u00b7 [Explore, product aauti-hub](/d/explore/explore?var-product=aauti-hub&from=now-6h&to=now)"
       }
     }
   ]

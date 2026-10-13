@@ -126,6 +126,10 @@ prod / nonprod / hub, then everything firing, pending, no data or erroring, grou
 It reads the rules directly (built-in *Alert list* panels split by the `tenant` / `severity` labels), so new rule groups show up without editing it.
 Filters: Tier (prod / nonprod / hub) → Cluster → Environment → Namespace → Severity, matched against the alerts' labels.
 Environment and Namespace only narrow workload alerts (node, agent and hub alerts carry neither), so keep them on *All* to see everything.
+The panels follow *Tier*: each Summary / Needs-attention panel repeats once per selected tier, so *prod* shows only prod,
+*nonprod* only nonprod, *All* all three. *Jump to a cluster* is a live table of the spoke clusters matching Tier and Cluster;
+clicking a cluster name opens its Cluster health, Workloads & logs, Resource usage, all its dashboards (incl. Jitsi Meet) or
+its alert rules, with that cluster selected. The hub's rules and Explore view are linked under the table.
 
 **Status (2026-10-12):** all 7 groups are deployed (Media-nonprod since 2026-10-08, the rest 2026-10-12): 85 rules,
 all healthy. The only alert is Platform-prod's "HPA at max replicas" for `aauti-marketplace` (expected, see the table);
