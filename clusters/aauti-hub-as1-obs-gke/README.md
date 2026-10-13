@@ -28,6 +28,14 @@
   agent log). With `logs.method: api` the agent reopens each pod's log stream about hourly from the last line it saw;
   for quiet `kube-system` pods (netd, node-local-dns, pdcsi-node, konnectivity-agent, kube-dns) that line predates
   onboarding, so it's resent and rejected each time. No current logs are lost; Loki accepts the rest of each push.
+  Because of this a spoke's `verify.ps1` can fail its gateway status-code check with a few 400s at any time (seen on
+  both Jitsi clusters on 2026-10-13); harmless when the agent log gives "timestamp too old" as the reason.
+- **MinIO users:** only the root credentials from Secret `observability-object-storage`. The chart sets `minio.users: []`
+  (since 2026-10-13; the MinIO sub-chart's default had created a `console` / `console123` user with `consoleAdmin`).
+  After deploying that, remove the existing user once with `mc admin user remove <alias> console` in the MinIO pod;
+  changing values doesn't delete it.
+- **Gateway CPU:** requests 500m (`gateway.resources` in `observability/values.yaml`, since 2026-10-13; chart default
+  50m). It used ~0.5 core with 6 spokes: nginx checks the bcrypt basic-auth hash on every push and query.
   The chart's Service is ClusterIP (used by Grafana); spokes come in through the internal LB below.
 - **Tenants:**
 
@@ -116,7 +124,8 @@ Deploy / upgrade:
 ```
 
 Both hub scripts stop with an error if `get-credentials` fails (VPN / gcloud login) or a rollout doesn't finish
-within 5 minutes, instead of carrying on against whatever kube context was current.
+within 5 minutes, and pass the hub context to every `kubectl` / `helm` call (`grafana/deploy.ps1` since 2026-10-13),
+so switching the current kube context in another shell mid-run can't send changes to another cluster.
 
 ## Alerts
 
@@ -126,6 +135,8 @@ prod / nonprod / hub, then everything firing, pending, no data or erroring, grou
 It reads the rules directly (built-in *Alert list* panels split by the `tenant` / `severity` labels), so new rule groups show up without editing it.
 Filters: Tier (prod / nonprod / hub) → Cluster → Environment → Namespace → Severity, matched against the alerts' labels.
 Environment and Namespace only narrow workload alerts (node, agent and hub alerts carry neither), so keep them on *All* to see everything.
+(The HPA, memory-near-limit and PVC rules keep `environment` through `on (...) group_left` since 2026-10-13; before that
+their alerts had no `environment`, so picking an Environment hid them.)
 The panels follow *Tier*: each Summary / Needs-attention panel repeats once per selected tier, so *prod* shows only prod,
 *nonprod* only nonprod, *All* all three. *Jump to a cluster* is a live table of the spoke clusters matching Tier and Cluster;
 clicking a cluster name opens its Cluster health, Workloads & logs, Resource usage, all its dashboards (incl. Jitsi Meet) or
@@ -133,8 +144,11 @@ its alert rules, with that cluster selected. The hub's rules and Explore view ar
 
 **Status (2026-10-12):** all 7 groups are deployed (Media-nonprod since 2026-10-08, the rest 2026-10-12): 85 rules,
 all healthy. The only alert is Platform-prod's "HPA at max replicas" for `aauti-marketplace` (expected, see the table);
-everything else is normal. No `-AlertEmails` were
-passed, so notifications go nowhere until `./grafana/deploy.ps1 -AlertEmails ... -SmtpUser ...` is run once.
+everything else is normal. No `-AlertEmails` were passed, so no one is notified until
+`./grafana/deploy.ps1 -AlertEmails ... -SmtpUser ...` is run once. Until then Grafana falls back to its built-in policy and
+contact point `grafana-default-email` (`<example@email.com>`); with no SMTP login Outlook refuses it, so the Grafana log shows
+"Notify for alerts failed … 530 5.7.57 Client not authenticated" for every firing alert (harmless). `deploy.ps1` refuses
+`-SmtpUser` without `-AlertEmails` (since 2026-10-13), so that fallback can never actually send mail.
 All prod and nonprod alerts share one notification policy (contact point `email-nonprod`); give prod its own contact point
 before turning email on.
 
@@ -165,7 +179,7 @@ before turning email on.
   enabled?" banner. Expected and harmless: Grafana also asks the `Mimir` datasource for data source-managed rules,
   and Mimir's ruler isn't served through the gateway. All rules here are Grafana-managed. (`manageAlerts: false` on
   the datasources would hide it; deliberately not set.)
-  Without recipients the rules still load but nothing is sent.
+  Without recipients the rules still load but no one is notified (see Status above).
 - Provisioned rules are read-only in the UI. To add a cluster, copy `media-nonprod.yaml` and change the
   `cluster` matcher, group name, `uid` prefix, the `tenant` label on every rule, the namespace filter of the
   error-log rule (`aauti-media-.+`), and the agent namespace / GCP project named in the descriptions

@@ -722,14 +722,14 @@
         "type": "prometheus",
         "uid": "__METRICS_DS__"
       },
-      "description": "",
+      "description": "Containers of completed (Succeeded) pods, e.g. finished Jobs, are not counted.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "__METRICS_DS__"
           },
-          "expr": "count(kube_pod_container_status_ready{cluster=~\"$cluster\", environment=~\"$environment|shared\", namespace=~\"$namespace\"} == 0) or vector(0)",
+          "expr": "count(kube_pod_container_status_ready{cluster=~\"$cluster\", environment=~\"$environment|shared\", namespace=~\"$namespace\"} == 0 unless on (cluster, namespace, pod) kube_pod_status_phase{cluster=~\"$cluster\", environment=~\"$environment|shared\", namespace=~\"$namespace\", phase=\"Succeeded\"} == 1) or vector(0)",
           "refId": "A",
           "legendFormat": "",
           "range": false,
@@ -1228,7 +1228,7 @@
             "type": "loki",
             "uid": "__LOGS_DS__"
           },
-          "expr": "{cluster=~\"$cluster\", log_type=\"k8s-event\"} |= \"type=Warning\"",
+          "expr": "{cluster=~\"$cluster\", environment=~\"$environment|shared\", namespace=~\"$namespace\", log_type=\"k8s-event\"} |= \"type=Warning\"",
           "refId": "A",
           "queryType": "range"
         }

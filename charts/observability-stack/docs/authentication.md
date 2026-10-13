@@ -1,6 +1,7 @@
 # Authentication, TLS and Grafana access
 
-> **In this repo** section 1 applies as written. Sections 2–3 describe the chart's bundled Grafana,
+> **In this repo** section 1 applies as written, with this repo's tenant ids (`<product>-<tier>`, e.g.
+> `media-nonprod`; there is no tenant `media`). Sections 2–3 describe the chart's bundled Grafana,
 > which is disabled on the hub. The standalone Grafana (`clusters/aauti-hub-as1-obs-gke/grafana/`)
 > has one `Loki` and one `Mimir` datasource that log in as the read-only federated user
 > `grafana-reader` (`gateway.reader`): the gateway sets its `X-Scope-OrgID` to every tenant and
@@ -41,7 +42,7 @@ Every write and read against Loki and Mimir goes through
 ### Get a tenant's credentials (hub admin)
 
 ```bash
-kubectl -n observability get secret observability-tenant-credentials -o jsonpath='{.data.media}' | base64 -d
+kubectl -n observability get secret observability-tenant-credentials -o jsonpath='{.data.media-nonprod}' | base64 -d
 kubectl -n observability get secret observability-hub-ca -o jsonpath='{.data.ca\.crt}' | base64 -d > hub-ca.crt
 ```
 

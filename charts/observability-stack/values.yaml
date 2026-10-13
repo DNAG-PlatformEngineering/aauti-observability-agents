@@ -227,6 +227,11 @@ gateway:
     # certificate. Distributed to Grafana, k6 and the hub agent.
     caCert: ""
     # -- Extra DNS names for the generated certificate (public host names).
+    # The generated CA + certificate are created once and reused on upgrades:
+    # later changes to extraDnsNames / extraIpAddresses / ingress.host are
+    # ignored, and nothing renews them before validityDays runs out. To
+    # regenerate, delete Secret observability-gateway-tls, upgrade, restart the
+    # gateway and hand the new CA to every spoke (and Grafana).
     extraDnsNames: []
     extraIpAddresses: []
     validityDays: 825
@@ -550,6 +555,9 @@ minio:
   # Buckets are created by templates/hub/minio-buckets.yaml (see
   # `observabilityBuckets`), not by the MinIO chart's post-install hook.
   buckets: []
+  # The upstream chart defaults to a `console`/`console123` consoleAdmin user;
+  # only the root credentials from existingSecret should exist.
+  users: []
   persistence:
     size: 10Gi
   resources:

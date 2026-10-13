@@ -139,7 +139,7 @@ data:
       forward_to = [prometheus.remote_write.hub.receiver]
       rule {
         source_labels = ["namespace"]
-        regex         = "{{ $a.environmentFromNamespace.regex }}"
+        regex         = {{ $a.environmentFromNamespace.regex | quote }}
         replacement   = "$1"
         target_label  = "environment"
       }
@@ -500,7 +500,7 @@ data:
       forward_to = [{{ $lwrite }}]
       rule {
         source_labels = ["namespace"]
-        regex         = "{{ $a.environmentFromNamespace.regex }}"
+        regex         = {{ $a.environmentFromNamespace.regex | quote }}
         replacement   = "$1"
         target_label  = "environment"
       }

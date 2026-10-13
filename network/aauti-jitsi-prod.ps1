@@ -26,9 +26,14 @@ param(
 )
 $ErrorActionPreference = "Stop"
 
+# Throws if gcloud fails (login / permissions), so -WhatIf never reports a
+# reachable peering as missing; warns when the peering exists but is not ACTIVE.
 function Test-Peering($project, $network, $name) {
-  $names = gcloud compute networks peerings list --network $network --project $project --format="value(peerings[].name)"
-  return (($names -split "[;,\s]+") -contains $name)
+  $json = gcloud compute networks peerings list --network $network --project $project --format=json
+  if ($LASTEXITCODE -ne 0) { throw "listing peerings of $project/$network failed (gcloud login / permissions?)" }
+  $peering = ($json | ConvertFrom-Json).peerings | Where-Object name -eq $name
+  if ($peering -and $peering.state -ne "ACTIVE") { Write-Warning "peering $name exists but is $($peering.state)" }
+  return [bool]$peering
 }
 
 # 1. Static internal IP for the gateway's internal load balancer (hub). Shared

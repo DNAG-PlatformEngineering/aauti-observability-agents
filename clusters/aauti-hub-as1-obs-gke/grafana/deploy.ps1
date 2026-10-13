@@ -22,17 +22,18 @@ gcloud container clusters get-credentials $Cluster --zone $Zone --project $Proje
 if ($LASTEXITCODE -ne 0) { throw "get-credentials for $Cluster failed (VPN / gcloud login?)" }
 $ctx = kubectl config current-context
 Write-Host "Using context $ctx"
+$provisioningChanged = $false
 
 # Pre-reserved global static IP used by the Ingress.
 $ip = gcloud compute addresses describe aauti-hub-vpc-as1-grafana-ip --global --project $Project --format="value(address)"
 
-kubectl create namespace $Namespace --dry-run=client -o yaml | kubectl apply -f -
+kubectl --context $ctx create namespace $Namespace --dry-run=client -o yaml | kubectl --context $ctx apply -f -
 
 # Admin secret: created once, never rotated by re-running this script.
-kubectl -n $Namespace get secret grafana-admin *> $null
+kubectl --context $ctx -n $Namespace get secret grafana-admin *> $null
 if ($LASTEXITCODE -ne 0) {
   $pw = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
-  kubectl -n $Namespace create secret generic grafana-admin --from-literal=admin-user=admin --from-literal=admin-password=$pw
+  kubectl --context $ctx -n $Namespace create secret generic grafana-admin --from-literal=admin-user=admin --from-literal=admin-password=$pw
 }
 
 # Gateway users whose password the datasources need: only the read-only
@@ -42,7 +43,7 @@ $tenants = @("grafana-reader")
 # Datasource credentials: copy the reader password + the gateway CA from the
 # observability namespace (Secrets can't be read across namespaces). Re-running
 # picks up rotations.
-$b64 = { param($s, $k) kubectl -n observability get secret $s -o jsonpath="{.data.$k}" }
+$b64 = { param($s, $k) kubectl --context $ctx -n observability get secret $s -o jsonpath="{.data.$k}" }
 $caB64 = & $b64 observability-hub-ca 'ca\.crt'
 if (-not $caB64) { throw "observability release not found - deploy ../observability first" }
 $data = "  ca.crt: $caB64"
@@ -58,7 +59,7 @@ metadata: { name: grafana-hub-datasource, namespace: $Namespace }
 type: Opaque
 data:
 $data
-"@ | kubectl apply -f -
+"@ | kubectl --context $ctx apply -f -
 if ($LASTEXITCODE -ne 0) { throw "creating grafana-hub-datasource failed" }
 
 # Dashboards: ConfigMap grafana-dashboards-<tenant> per provider in values.yaml,
@@ -94,11 +95,11 @@ foreach ($t in $dashboards.Keys) {
     [IO.File]::WriteAllText((Join-Path $tmp "$t-$($f.Name)"), $json)
   }
   # Server-side apply: dashboards exceed the client-side last-applied annotation limit.
-  $before = kubectl -n $Namespace get configmap "grafana-dashboards-$t" -o jsonpath="{.metadata.resourceVersion}" 2>$null
-  kubectl -n $Namespace create configmap "grafana-dashboards-$t" --from-file=$tmp --dry-run=client -o yaml |
-    kubectl apply --server-side --force-conflicts -f -
+  $before = kubectl --context $ctx -n $Namespace get configmap "grafana-dashboards-$t" -o jsonpath="{.metadata.resourceVersion}" 2>$null
+  kubectl --context $ctx -n $Namespace create configmap "grafana-dashboards-$t" --from-file=$tmp --dry-run=client -o yaml |
+    kubectl --context $ctx apply --server-side --force-conflicts -f -
   if ($LASTEXITCODE -ne 0) { throw "creating grafana-dashboards-$t failed" }
-  $after = kubectl -n $Namespace get configmap "grafana-dashboards-$t" -o jsonpath="{.metadata.resourceVersion}"
+  $after = kubectl --context $ctx -n $Namespace get configmap "grafana-dashboards-$t" -o jsonpath="{.metadata.resourceVersion}"
   if ($before -and $before -ne $after) { $provisioningChanged = $true }
   Remove-Item -Recurse -Force $tmp
 }
@@ -106,35 +107,35 @@ foreach ($t in $dashboards.Keys) {
 # Explore dashboard (folder Explore): dashboards/*.json as is (already on the
 # "Loki" / "Mimir" datasources, all products). --from-file takes only the files
 # directly in the folder, not dashboards/alerts/.
-$before = kubectl -n $Namespace get configmap grafana-dashboards-explore -o jsonpath="{.metadata.resourceVersion}" 2>$null
-kubectl -n $Namespace create configmap grafana-dashboards-explore --from-file="$PSScriptRoot/dashboards" --dry-run=client -o yaml |
-  kubectl apply --server-side --force-conflicts -f -
+$before = kubectl --context $ctx -n $Namespace get configmap grafana-dashboards-explore -o jsonpath="{.metadata.resourceVersion}" 2>$null
+kubectl --context $ctx -n $Namespace create configmap grafana-dashboards-explore --from-file="$PSScriptRoot/dashboards" --dry-run=client -o yaml |
+  kubectl --context $ctx apply --server-side --force-conflicts -f -
 if ($LASTEXITCODE -ne 0) { throw "creating grafana-dashboards-explore failed" }
-$after = kubectl -n $Namespace get configmap grafana-dashboards-explore -o jsonpath="{.metadata.resourceVersion}"
+$after = kubectl --context $ctx -n $Namespace get configmap grafana-dashboards-explore -o jsonpath="{.metadata.resourceVersion}"
 if ($before -and $before -ne $after) { $provisioningChanged = $true }
 
 # Alerts overview (folder Alerts, next to the alert rules): dashboards/alerts/*.json.
 # Must exist before helm upgrade (values.yaml mounts it).
-$before = kubectl -n $Namespace get configmap grafana-dashboards-alerts -o jsonpath="{.metadata.resourceVersion}" 2>$null
-kubectl -n $Namespace create configmap grafana-dashboards-alerts --from-file="$PSScriptRoot/dashboards/alerts" --dry-run=client -o yaml |
-  kubectl apply --server-side --force-conflicts -f -
+$before = kubectl --context $ctx -n $Namespace get configmap grafana-dashboards-alerts -o jsonpath="{.metadata.resourceVersion}" 2>$null
+kubectl --context $ctx -n $Namespace create configmap grafana-dashboards-alerts --from-file="$PSScriptRoot/dashboards/alerts" --dry-run=client -o yaml |
+  kubectl --context $ctx apply --server-side --force-conflicts -f -
 if ($LASTEXITCODE -ne 0) { throw "creating grafana-dashboards-alerts failed" }
-$after = kubectl -n $Namespace get configmap grafana-dashboards-alerts -o jsonpath="{.metadata.resourceVersion}"
+$after = kubectl --context $ctx -n $Namespace get configmap grafana-dashboards-alerts -o jsonpath="{.metadata.resourceVersion}"
 if (-not $before -or $before -ne $after) { $provisioningChanged = $true }
 
 # Alert rules: ConfigMap grafana-alerting-rules from alerting/*.yaml.
-$before = kubectl -n $Namespace get configmap grafana-alerting-rules -o jsonpath="{.metadata.resourceVersion}" 2>$null
-kubectl -n $Namespace create configmap grafana-alerting-rules --from-file="$PSScriptRoot/alerting" --dry-run=client -o yaml |
-  kubectl apply --server-side --force-conflicts -f -
+$before = kubectl --context $ctx -n $Namespace get configmap grafana-alerting-rules -o jsonpath="{.metadata.resourceVersion}" 2>$null
+kubectl --context $ctx -n $Namespace create configmap grafana-alerting-rules --from-file="$PSScriptRoot/alerting" --dry-run=client -o yaml |
+  kubectl --context $ctx apply --server-side --force-conflicts -f -
 if ($LASTEXITCODE -ne 0) { throw "creating grafana-alerting-rules failed" }
-$after = kubectl -n $Namespace get configmap grafana-alerting-rules -o jsonpath="{.metadata.resourceVersion}"
+$after = kubectl --context $ctx -n $Namespace get configmap grafana-alerting-rules -o jsonpath="{.metadata.resourceVersion}"
 if ($before -and $before -ne $after) { $provisioningChanged = $true }
 
 # Email contact point + notification policy: Secret grafana-alerting-notify. Only
 # notify.yaml is mounted; the recipients are also kept as their own key so
 # re-running without -AlertEmails keeps them.
 $stored = { param($secret, $key)
-  $v = kubectl -n $Namespace get secret $secret -o jsonpath="{.data.$key}" 2>$null
+  $v = kubectl --context $ctx -n $Namespace get secret $secret -o jsonpath="{.data.$key}" 2>$null
   if ($v) { [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($v)) } }
 if (-not $AlertEmails) { $AlertEmails = & $stored grafana-alerting-notify alert-emails }
 $AlertEmails = (($AlertEmails -split '[;,\s]+') | Where-Object { $_ }) -join ';'
@@ -168,6 +169,7 @@ policies:
 # GF_SMTP_PASSWORD / GF_SMTP_FROM_ADDRESS (values.yaml envValueFrom).
 $storedSmtpUser = & $stored grafana-smtp user
 if (-not $SmtpUser) { $SmtpUser = $storedSmtpUser }
+if ($SmtpUser -and -not $AlertEmails) { throw "-SmtpUser needs -AlertEmails: without recipients Grafana sends alerts to its built-in default contact point (example@email.com)" }
 # Reuse the stored password only for the same mailbox; a new mailbox prompts below.
 if ($SmtpUser -and -not $SmtpPassword -and $SmtpUser -eq $storedSmtpUser) { $SmtpPassword = & $stored grafana-smtp password }
 if ($SmtpUser -and -not $SmtpPassword) {
@@ -181,21 +183,21 @@ New-Item -ItemType Directory $tmp | Out-Null
 try {
   [IO.File]::WriteAllText("$tmp/notify.yaml", $notify)
   [IO.File]::WriteAllText("$tmp/alert-emails", $AlertEmails)
-  $before = kubectl -n $Namespace get secret grafana-alerting-notify -o jsonpath="{.metadata.resourceVersion}" 2>$null
-  kubectl -n $Namespace create secret generic grafana-alerting-notify --from-file="$tmp/notify.yaml" `
-    --from-file="$tmp/alert-emails" --dry-run=client -o yaml | kubectl apply -f -
+  $before = kubectl --context $ctx -n $Namespace get secret grafana-alerting-notify -o jsonpath="{.metadata.resourceVersion}" 2>$null
+  kubectl --context $ctx -n $Namespace create secret generic grafana-alerting-notify --from-file="$tmp/notify.yaml" `
+    --from-file="$tmp/alert-emails" --dry-run=client -o yaml | kubectl --context $ctx apply -f -
   if ($LASTEXITCODE -ne 0) { throw "creating grafana-alerting-notify failed" }
-  $after = kubectl -n $Namespace get secret grafana-alerting-notify -o jsonpath="{.metadata.resourceVersion}"
+  $after = kubectl --context $ctx -n $Namespace get secret grafana-alerting-notify -o jsonpath="{.metadata.resourceVersion}"
   if ($before -and $before -ne $after) { $provisioningChanged = $true }
 
   if ($SmtpUser) {
     [IO.File]::WriteAllText("$tmp/user", $SmtpUser)
     [IO.File]::WriteAllText("$tmp/password", $SmtpPassword)
-    $before = kubectl -n $Namespace get secret grafana-smtp -o jsonpath="{.metadata.resourceVersion}" 2>$null
-    kubectl -n $Namespace create secret generic grafana-smtp --from-file="$tmp/user" --from-file="$tmp/password" `
-      --dry-run=client -o yaml | kubectl apply -f -
+    $before = kubectl --context $ctx -n $Namespace get secret grafana-smtp -o jsonpath="{.metadata.resourceVersion}" 2>$null
+    kubectl --context $ctx -n $Namespace create secret generic grafana-smtp --from-file="$tmp/user" --from-file="$tmp/password" `
+      --dry-run=client -o yaml | kubectl --context $ctx apply -f -
     if ($LASTEXITCODE -ne 0) { throw "creating grafana-smtp failed" }
-    $after = kubectl -n $Namespace get secret grafana-smtp -o jsonpath="{.metadata.resourceVersion}"
+    $after = kubectl --context $ctx -n $Namespace get secret grafana-smtp -o jsonpath="{.metadata.resourceVersion}"
     # env vars are only read at start-up: restart on a change and on first creation
     if ($before -ne $after) { $provisioningChanged = $true }
   }
@@ -212,12 +214,12 @@ if ($LASTEXITCODE -ne 0) { throw "helm install failed" }
 # and alerting provisioning is only read at start-up: restart so changed
 # dashboards / alert rules / contact points take effect immediately.
 if ($provisioningChanged) {
-  kubectl -n $Namespace rollout restart deploy/grafana
+  kubectl --context $ctx -n $Namespace rollout restart deploy/grafana
   if ($LASTEXITCODE -ne 0) { throw "restarting grafana failed" }
-  kubectl -n $Namespace rollout status deploy/grafana --timeout 5m
+  kubectl --context $ctx -n $Namespace rollout status deploy/grafana --timeout 5m
   if ($LASTEXITCODE -ne 0) { throw "grafana rollout did not finish within 5m" }
 }
 
 Write-Host ""
 Write-Host "Static IP: $ip  -> create Cloudflare A record 'grafana' -> $ip (DNS only / grey cloud)"
-Write-Host "Cert status: kubectl -n $Namespace get managedcertificate grafana-cert"
+Write-Host "Cert status: kubectl --context $ctx -n $Namespace get managedcertificate grafana-cert"

@@ -83,6 +83,8 @@ gcloud container clusters get-credentials aauti-jitsi-nonprod-gke --zone asia-so
 ./clusters/aauti-jitsi-nonprod-gke/observability-agent/deploy.ps1
 
 # 5. Verify (read-only), ~10-12 minutes after step 4 (first-start "timestamp too old" 400s must leave the window).
+#    Later runs can still show a few 400s (quiet kube-system pods' old lines, rejected about hourly; see the hub README):
+#    harmless if the agent log says "timestamp too old".
 ./clusters/aauti-jitsi-nonprod-gke/observability-agent/verify.ps1
 ```
 
@@ -148,6 +150,8 @@ For each new cluster:
 4. **Roll out** in the same order: network → hub → Grafana → agent → `verify.ps1`.
    On a cluster whose pods are older than 7 days, the agent's first minutes replay old pod logs that Loki rejects
    (HTTP 400 "timestamp too old"); the gateway status check fails until those leave its 10-minute window, so run `verify.ps1` ~10-12 minutes after the agent install.
+   Later runs can still fail that check with a few 400s: quiet `kube-system` pods' pre-onboarding lines are resent and
+   rejected about hourly (see the hub README, *Rejected old log lines*); harmless when the agent log says "timestamp too old".
 5. **Alerts.** Copy `../aauti-hub-as1-obs-gke/grafana/alerting/media-nonprod.yaml` (nonprod) or `media-prod.yaml`
    (prod; its HPA rule skips min = max) to `<tenant>.yaml`, then change the `cluster` matcher, `tenant` label, group
    name, `uid` prefix, agent namespace and the namespaces of the error-log rule. Run each query in Explore first: drop

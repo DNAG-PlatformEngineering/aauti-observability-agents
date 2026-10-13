@@ -141,6 +141,11 @@ gateway:
   # Read-only user "grafana-reader" for Grafana's single "Loki" / "Mimir"
   # datasources: the gateway pins it to all tenants (federation), no push.
   reader: { enabled: true }
+  # Measured ~0.5 core with 6 spokes (nginx checks the bcrypt basic-auth hash
+  # on every push / query), so reserve it; the chart default is 50m.
+  resources:
+    requests: { cpu: 500m, memory: 32Mi }
+    limits: { memory: 128Mi }
 
 # Every pod must run on the dedicated node pool (tainted workload=observability).
 scheduling: &sched

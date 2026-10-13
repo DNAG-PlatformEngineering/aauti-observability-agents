@@ -36,6 +36,7 @@ Second **spoke** of the hub observability stack, onboarded like
 | [`../aauti-hub-as1-obs-gke/observability/values.yaml`](../aauti-hub-as1-obs-gke/observability/values.yaml) | hub | tenant `media-nonprod` (limits; logs dev/sandbox/shared 7d, qa/demo 10d; metrics 10d) |
 | [`../aauti-hub-as1-obs-gke/observability/gateway-internal-lb.yaml`](../aauti-hub-as1-obs-gke/observability/gateway-internal-lb.yaml) | hub | node + pod ranges 10.32.0.0/24, 10.33.0.0/17 |
 | [`../aauti-hub-as1-obs-gke/grafana/values.yaml`](../aauti-hub-as1-obs-gke/grafana/values.yaml) + `deploy.ps1` | hub | folder Media-nonprod |
+| [`../../network/aauti-media-nonprod.ps1`](../../network/aauti-media-nonprod.ps1) | both VPCs | checks the existing peering and gateway IP (recreates the peering if missing; `-WhatIf`) |
 | [`observability-agent/values.yaml`](observability-agent/values.yaml) | this cluster | agent Helm values |
 | [`observability-agent/deploy.ps1`](observability-agent/deploy.ps1) | this cluster | copies credentials and CA from the hub, runs `helm upgrade --install` |
 | [`observability-agent/verify.ps1`](observability-agent/verify.ps1) | both (read-only) | checks the private path, TLS, auth, and data in Grafana |
@@ -50,6 +51,9 @@ cd D:\aauti-observability-agents
 gcloud container clusters get-credentials aauti-hub-as1-obs-gke --zone asia-south1-a --project aauti-hub
 gcloud container clusters get-credentials aauti-media-nonprod-as1-gke --zone asia-south1-a --project aauti-media-nonprod
 
+# 0. Network check (read-only on the current state).
+./network/aauti-media-nonprod.ps1 -WhatIf
+
 # 1. Hub: tenant "media-nonprod" + LB source ranges. The gateway pod restarts once.
 ./clusters/aauti-hub-as1-obs-gke/observability/deploy.ps1
 
@@ -60,6 +64,8 @@ gcloud container clusters get-credentials aauti-media-nonprod-as1-gke --zone asi
 ./clusters/aauti-media-nonprod-as1-gke/observability-agent/deploy.ps1
 
 # 4. Verify (read-only), ~10-12 minutes after step 3 (first-start "timestamp too old" 400s must leave the window).
+#    Later runs can still show a few 400s (quiet kube-system pods' old lines, rejected about hourly; see the hub README):
+#    harmless if the agent log says "timestamp too old".
 ./clusters/aauti-media-nonprod-as1-gke/observability-agent/verify.ps1
 ```
 

@@ -16,7 +16,7 @@ Platform **prod spoke** of the hub observability stack, onboarded like
 | Agent namespace / Helm release | `observability-agent-platformprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-platform-prod-as1-gke`, `tier=prod`, `product=platform`, `environment=prod` (single-environment cluster, so every namespace and the nodes), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). `env` = same value as `environment` |
 | Retention | logs and metrics 30d (tenant `platform-prod`) |
-| Status | **Deployed** 2026-10-08 (verify.ps1: everything passes except the gateway status-code check, whose 400s were the one-time first-start backfill of log lines older than 7 days, rejected by Loki). Alert rules ([platform-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/platform-prod.yaml), 14 rules) deployed 2026-10-12 (no recipients yet, so nothing is sent); its "HPA at max" rule fires for `aauti-marketplace` (at 5/5 replicas 84% of the time, driven by its 70% memory target on a 512Mi request). |
+| Status | **Deployed** 2026-10-08 (verify.ps1 at first failed only the gateway status-code check, whose 400s were the one-time first-start backfill of log lines older than 7 days, rejected by Loki; all checks pass since, re-checked 2026-10-13). Alert rules ([platform-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/platform-prod.yaml), 14 rules) deployed 2026-10-12 (no recipients yet, so nothing is sent); its "HPA at max" rule fires for `aauti-marketplace` (at 5/5 replicas 84% of the time, driven by its 70% memory target on a 512Mi request). |
 
 ## Differences from media-prod
 
@@ -63,6 +63,8 @@ gcloud container clusters get-credentials aauti-platform-prod-as1-gke --region a
 ./clusters/aauti-platform-prod-as1-gke/observability-agent/deploy.ps1
 
 # 4. Verify (read-only), ~10-12 minutes after step 3 (first-start "timestamp too old" 400s must leave the window).
+#    Later runs can still show a few 400s (quiet kube-system pods' old lines, rejected about hourly; see the hub README):
+#    harmless if the agent log says "timestamp too old".
 ./clusters/aauti-platform-prod-as1-gke/observability-agent/verify.ps1
 ```
 

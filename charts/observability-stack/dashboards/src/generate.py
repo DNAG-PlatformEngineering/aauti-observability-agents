@@ -187,7 +187,7 @@ def env_cluster_vars():
     ]
 
 
-def log_env_cluster_vars(ns_sel=""):
+def log_env_cluster_vars():
     # Same selectors for log-centric dashboards (kept as a separate name for callers).
     return env_cluster_vars()
 
@@ -218,7 +218,8 @@ def cluster_health(extra_rows=None):
         stat(g, "CPU utilisation", f'sum(rate(container_cpu_usage_seconds_total{{{C}, container!=""}}[5m])) / sum(machine_cpu_cores{{{C}}})', "percentunit", thresholds=UTIL, w=4),
         stat(g, "Memory utilisation", f'sum(container_memory_working_set_bytes{{{C}, container!=""}}) / sum(machine_memory_bytes{{{C}}})', "percentunit", thresholds=UTIL, w=4),
         stat(g, "Scrape targets down", f'count(up{{{C}}} == 0) or vector(0)', thresholds=RED, w=4),
-        stat(g, "Containers not ready", f'count(kube_pod_container_status_ready{{{CN}}} == 0) or vector(0)', thresholds=RED, w=4),
+        stat(g, "Containers not ready", f'count(kube_pod_container_status_ready{{{CN}}} == 0 unless on (cluster, namespace, pod) kube_pod_status_phase{{{CN}, phase="Succeeded"}} == 1) or vector(0)',
+             thresholds=RED, w=4, desc="Containers of completed (Succeeded) pods, e.g. finished Jobs, are not counted."),
         stat(g, "Jobs failed", f'sum(kube_job_status_failed{{{CN}}}) or vector(0)', thresholds=RED, w=4),
         stat(g, "PVCs > 80% full", f'count((kubelet_volume_stats_used_bytes{{{CN}}} / kubelet_volume_stats_capacity_bytes{{{CN}}}) > 0.8) or vector(0)', thresholds=RED, w=4),
     ]
@@ -234,7 +235,7 @@ def cluster_health(extra_rows=None):
               columns={"Value": "missing replicas"}, w=24, h=6),
     ]
     p.append(row(g, "Kubernetes events"))
-    p.append(logs(g, "Warning events", f'{{{C}, log_type="k8s-event"}} |= "type=Warning"'))
+    p.append(logs(g, "Warning events", f'{{{CN}, log_type="k8s-event"}} |= "type=Warning"'))
     if extra_rows:
         p += extra_rows(g)
     return dashboard("cluster-health", "Cluster health", p, cluster_vars(), ["kubernetes", "health"],
@@ -408,7 +409,7 @@ def jitsi_meet():
     JVB = f'{J}, pod=~".*-jvb-[0-9]+"'
     JIC = f'{J}, pod=~".*-jicofo-.*"'
     PRO = f'{J}, pod=~".*-prosody-.*"'
-    variables = log_env_cluster_vars('namespace=~"jitsi.*"') + [
+    variables = log_env_cluster_vars() + [
         var_query("pod", "Pod (logs)", 'label_values({cluster=~"$cluster", environment=~"$environment", namespace=~"jitsi.*"}, pod)', ds=L),
         {"name": "search", "label": "Log search (regex)", "type": "textbox", "query": "", "current": {"value": ""}, "hide": 0},
     ]

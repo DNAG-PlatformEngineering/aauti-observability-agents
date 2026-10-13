@@ -30,7 +30,10 @@ export const options = {
     },
   },
   thresholds: {
-    http_req_failed: [`rate<${MAX_FAIL}`],
+    // Only the real endpoints: the deliberate /api/error 500s (ERROR_RATIO)
+    // would otherwise fail this threshold by design.
+    'http_req_failed{name:home}': [`rate<${MAX_FAIL}`],
+    'http_req_failed{name:items}': [`rate<${MAX_FAIL}`],
     http_req_duration: [`p(95)<${P95}`],
     checks: ['rate>0.99'],
   },

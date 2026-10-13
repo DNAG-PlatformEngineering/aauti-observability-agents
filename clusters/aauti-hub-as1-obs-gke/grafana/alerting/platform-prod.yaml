@@ -179,7 +179,7 @@ groups:
               instant: true
               expr: >-
                 max by (environment, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster="aauti-platform-prod-as1-gke"})
-                >= on (namespace, horizontalpodautoscaler)
+                >= on (namespace, horizontalpodautoscaler) group_left
                 max by (namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster="aauti-platform-prod-as1-gke"})
                 and on (namespace, horizontalpodautoscaler)
                 (max by (namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster="aauti-platform-prod-as1-gke"})
@@ -207,7 +207,7 @@ groups:
               instant: true
               expr: >-
                 max by (environment, namespace, pod, container) (container_memory_working_set_bytes{cluster="aauti-platform-prod-as1-gke", container!="", container!="POD"})
-                / on (namespace, pod, container)
+                / on (namespace, pod, container) group_left
                 max by (namespace, pod, container) (kube_pod_container_resource_limits{cluster="aauti-platform-prod-as1-gke", resource="memory"})
           - refId: C
             datasourceUid: __expr__
@@ -232,7 +232,7 @@ groups:
               instant: true
               expr: >-
                 max by (environment, namespace, persistentvolumeclaim) (kubelet_volume_stats_used_bytes{cluster="aauti-platform-prod-as1-gke"})
-                / on (namespace, persistentvolumeclaim)
+                / on (namespace, persistentvolumeclaim) group_left
                 max by (namespace, persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{cluster="aauti-platform-prod-as1-gke"})
           - refId: C
             datasourceUid: __expr__

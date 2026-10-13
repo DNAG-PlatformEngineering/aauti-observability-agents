@@ -75,6 +75,8 @@ try {
 
 # Password changes (rotation) are only read at start-up.
 kubectl --context $SpokeContext -n $Namespace rollout restart statefulset/$Release-alloy
+if ($LASTEXITCODE -ne 0) { throw "restarting $Release-alloy failed" }
 kubectl --context $SpokeContext -n $Namespace rollout status statefulset/$Release-alloy --timeout 5m
+if ($LASTEXITCODE -ne 0) { throw "$Release-alloy did not become ready within 5m" }
 kubectl --context $SpokeContext -n $Namespace get pods -o wide
 Write-Host "`nNext: ./verify.ps1"

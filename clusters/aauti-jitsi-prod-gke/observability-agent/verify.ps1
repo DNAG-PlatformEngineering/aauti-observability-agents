@@ -34,7 +34,7 @@ Check ($fr -and $fr[0].loadBalancingScheme -eq "INTERNAL") "gateway LB $GatewayI
 # the description. Grafana and ArgoCD have their own external rules in this project.
 $pub = gcloud compute forwarding-rules list --project aauti-hub --format=json | ConvertFrom-Json |
   Where-Object { $_.loadBalancingScheme -like "EXTERNAL*" -and $_.description -match '"observability/observability-gateway' }
-Check (-not $pub) "no external forwarding rule exposes the gateway"
+Check ($LASTEXITCODE -eq 0 -and -not $pub) "no external forwarding rule exposes the gateway"
 $cfg = kubectl --context $SpokeContext -n $Namespace get configmap $Release-config -o jsonpath="{.data.config\.alloy}"
 $urls = [regex]::Matches($cfg, 'url\s*=\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value }
 Check ($urls.Count -ge 2 -and -not ($urls | Where-Object { $_ -notlike "https://$GatewayIp/*" })) "agent sends only to https://$GatewayIp ($($urls -join ', '))"
@@ -43,6 +43,7 @@ Write-Host "`n== TLS + authentication"
 Check ($cfg -notmatch "insecure_skip_verify\s*=\s*true") "agent verifies the hub certificate (no insecure_skip_verify)"
 Check ($cfg -match 'server_name\s*=\s*"observability-gateway.observability.svc"' -and $cfg -match "ca_file") "agent pins hub CA + SNI observability-gateway.observability.svc"
 $agentLog = kubectl --context $SpokeContext -n $Namespace logs statefulset/$Release-alloy --since=15m 2>&1 | Out-String
+Check ($LASTEXITCODE -eq 0) "agent log is readable (statefulset/$Release-alloy)"
 foreach ($pat in @("x509", "certificate", "status=401", "status=403", "status=429", "connection refused", "i/o timeout")) {
   $n = ([regex]::Matches($agentLog, [regex]::Escape($pat))).Count
   Check ($n -eq 0) "agent log (15m) has no '$pat' errors ($n)"
@@ -79,7 +80,8 @@ try {
   $ft = ($fm.data.result.metric.__tenant_id__ | Sort-Object -Unique) -join ","
   Check ($fm.data.result.Count -gt 0 -and $ft -eq $Tenant -and -not ($fm.data.result.metric | Where-Object { -not $_.env })) "federated Mimir: product=$Product, env set, tenant $ft"
   $fl = & $q "loki" "loki/api/v1/query" "sum by (__tenant_id__, env) (count_over_time({cluster=`"$Cluster`", product=`"$Product`"}[10m]))"
-  Check ($fl.data.result.Count -gt 0 -and -not ($fl.data.result.metric | Where-Object { -not $_.env })) "federated Loki: product=$Product, env set ($(($fl.data.result.metric.env | Sort-Object -Unique) -join ','))"
+  $flt = ($fl.data.result.metric.__tenant_id__ | Sort-Object -Unique) -join ","
+  Check ($fl.data.result.Count -gt 0 -and $flt -eq $Tenant -and -not ($fl.data.result.metric | Where-Object { -not $_.env })) "federated Loki: product=$Product, tenant $flt, env set ($(($fl.data.result.metric.env | Sort-Object -Unique) -join ','))"
 } catch { Check $false "Grafana query failed: $($_.Exception.Message)" }
 
 Write-Host ""

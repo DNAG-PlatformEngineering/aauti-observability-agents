@@ -32,7 +32,8 @@ k6:
 ```
 
 `files/k6/http-load.js` is a parametrised ramp-up / steady / ramp-down test
-with thresholds for failure rate, p95 latency and checks. The job's exit
+with thresholds for failure rate (of the `home` and `items` requests only: the deliberate
+`/api/error` 500s from `ERROR_RATIO` don't count), p95 latency and checks. The job's exit
 code is non-zero when a threshold fails.
 
 ## Run

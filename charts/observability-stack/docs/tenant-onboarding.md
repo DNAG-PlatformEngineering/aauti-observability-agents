@@ -4,8 +4,10 @@
 > `clusters/aauti-jitsi-nonprod-gke/README.md` instead: it uses the per-cluster `deploy.ps1` /
 > `verify.ps1`, the internal LB `gateway-internal-lb.yaml`, and adds a dashboard folder to the
 > standalone Grafana. There are no per-tenant datasources: the hub upgrade adds the new tenant to
-> `grafana-reader`, so the shared `Loki` / `Mimir` datasources read it automatically. Two steps are easy to
-> miss: add the tenant to `$dashboards` in `clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1`, and add the
+> `grafana-reader`, so the shared `Loki` / `Mimir` datasources read it automatically. Three steps are easy to
+> miss: add the tenant to `$dashboards` in `clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1` **and** a
+> dashboard provider + `dashboardsConfigMaps` entry in `clusters/aauti-hub-as1-obs-gke/grafana/values.yaml`
+> (without it the ConfigMap is created but never mounted, so no folder appears), and add the
 > spoke's node + pod ranges to `loadBalancerSourceRanges` in `gateway-internal-lb.yaml` (plus a
 > `network/aauti-<product>-<tier>.ps1`). `scripts/onboard-spoke.ps1` and `environments/` are POC-only.
 

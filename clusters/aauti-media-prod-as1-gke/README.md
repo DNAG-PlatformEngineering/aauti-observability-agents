@@ -65,6 +65,8 @@ gcloud container clusters get-credentials aauti-media-prod-as1-gke --region asia
 ./clusters/aauti-media-prod-as1-gke/observability-agent/deploy.ps1
 
 # 4. Verify (read-only), ~10-12 minutes after step 3 (first-start "timestamp too old" 400s must leave the window).
+#    Later runs can still show a few 400s (quiet kube-system pods' old lines, rejected about hourly; see the hub README):
+#    harmless if the agent log says "timestamp too old".
 ./clusters/aauti-media-prod-as1-gke/observability-agent/verify.ps1
 ```
 
