@@ -552,6 +552,10 @@ minio:
     repository: docker.io/pgsty/mc
     tag: RELEASE.2026-03-13T08-57-32Z
   existingSecret: observability-object-storage
+  # Standalone MinIO has one ReadWriteOnce PVC: the sub-chart's RollingUpdate
+  # (maxUnavailable 0) deadlocks on any pod change (new pod can't attach the
+  # volume while the old one holds it), so replace the pod instead.
+  deploymentUpdate: { type: Recreate }
   # Buckets are created by templates/hub/minio-buckets.yaml (see
   # `observabilityBuckets`), not by the MinIO chart's post-install hook.
   buckets: []
