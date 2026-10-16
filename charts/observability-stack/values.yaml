@@ -201,6 +201,12 @@ gateway:
   reader:
     enabled: false
     username: grafana-reader
+  # -- More read-only users, each pinned to the listed tenants only (e.g. one
+  # per tier, for separate prod / nonprod Grafana datasources). Same rules as
+  # `reader`: password generated into observability-tenant-credentials under
+  # `username`, push returns 403, needs the same federation settings.
+  #   - { username: grafana-reader-prod, tenants: [media-prod, jitsi-prod] }
+  extraReaders: []
   image:
     repository: docker.io/nginxinc/nginx-unprivileged
     tag: 1.29-alpine

@@ -39,6 +39,22 @@
 {{- fail (printf "gateway.reader.username %q is also a tenant id; pick another name" .Values.gateway.reader.username) }}
 {{- end }}
 {{- end }}
+{{- range .Values.gateway.extraReaders }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9_-]*$" (.username | default "")) }}
+{{- fail "gateway.extraReaders[].username must match ^[a-z0-9][a-z0-9_-]*$" }}
+{{- end }}
+{{- if or (hasKey $.Values.tenants .username) (eq .username $.Values.gateway.reader.username) }}
+{{- fail (printf "gateway.extraReaders username %q clashes with a tenant id or gateway.reader.username" .username) }}
+{{- end }}
+{{- if not .tenants }}
+{{- fail (printf "gateway.extraReaders %q needs a non-empty tenants list" .username) }}
+{{- end }}
+{{- range .tenants }}
+{{- if not (hasKey $.Values.tenants .) }}
+{{- fail (printf "gateway.extraReaders: tenant %q is not defined in tenants" .) }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- if and .Values.k6.enabled (not (hasKey .Values.tenants .Values.k6.tenant)) }}
 {{- fail (printf "k6.tenant %q is not defined in tenants" .Values.k6.tenant) }}
 {{- end }}

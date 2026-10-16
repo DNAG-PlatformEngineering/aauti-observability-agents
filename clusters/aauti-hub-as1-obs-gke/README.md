@@ -74,15 +74,22 @@
   (`aauti-hub|jitsi-nonprod|jitsi-prod|media-nonprod|media-prod|platform-nonprod|platform-prod`, Loki `multi_tenant_queries_enabled`, Mimir
   `tenant_federation`) and returns 403 if it tries to push. Results carry `__tenant_id__`; filter with `product` / `env` /
   `cluster` / `namespace` / `app` / `pod` / `container`. A new tenant is included automatically after `observability/deploy.ps1`.
+- **Grafana datasources per tier** (added 2026-10-15): `Loki – Prod` / `Mimir – Prod` (uids `loki-prod` / `mimir-prod`) read only
+  `jitsi-prod|media-prod|platform-prod`, as read-only user `grafana-reader-prod`; `Loki – Nonprod` / `Mimir – Nonprod`
+  (`loki-nonprod` / `mimir-nonprod`) read only `jitsi-nonprod|media-nonprod|platform-nonprod`, as `grafana-reader-nonprod`.
+  The gateway pins them (`gateway.extraReaders` in `observability/values.yaml`), so even a query without filters can't see the
+  other tier; push returns 403. `aauti-hub` is in neither (use `Loki` / `Mimir`). A new tenant must be added to its tier's
+  `extraReaders` list by hand.
 - **Dashboard Explore** (folder *Explore*, `grafana/dashboards/explore.json`, loaded by `grafana/deploy.ps1` as ConfigMap
   `grafana-dashboards-explore`): fields Product → Env → Cluster → Namespace → App → Pod → Container (Loki label values, each
   narrowed by the ones before it) over `Loki` / `Mimir`, i.e. all products.
-- **No per-tenant datasources** (removed 2026-10-06, so Explore lists only `Loki` and `Mimir`). The folder dashboards
+- **No per-tenant datasources** (removed 2026-10-06; Explore lists `Loki` / `Mimir` plus the per-tier pairs). The folder dashboards
   (*Jitsi-nonprod*, *Jitsi-prod*, *Media-nonprod*, *Media-prod*, *Platform-nonprod*, *Platform-prod*) use `Loki` / `Mimir` too; `grafana/deploy.ps1`
   limits each folder's *Cluster* variable to its own tenant (`label_values(up{__tenant_id__="<tenant>"}, cluster)`, "All" =
   those clusters only), and every panel filters on `$cluster`, so a folder never shows another tenant's data.
   The datasources connect over HTTPS to `observability-gateway.observability.svc` and verify the gateway CA.
-  `grafana/deploy.ps1` copies the `grafana-reader` password and the CA into Secret `grafana-hub-datasource`, so run it again after rotating either.
+  `grafana/deploy.ps1` copies the `grafana-reader`, `grafana-reader-prod` and `grafana-reader-nonprod` passwords and the CA into
+  Secret `grafana-hub-datasource`, so run it again after rotating any of them.
 - Every pod runs on node pool `observability`. The chart copy adds `scheduling` for its own gateway, bucket Job,
   k6 CronJobs and grafana-access Job.
 - Tenant passwords are in Secret `observability-tenant-credentials`, and the gateway CA is in `observability-hub-ca`.
@@ -144,13 +151,14 @@ its alert rules, with that cluster selected. The hub's rules and Explore view ar
 
 **Status (2026-10-12):** all 7 groups are deployed (Media-nonprod since 2026-10-08, the rest 2026-10-12): 85 rules,
 all healthy. The only alert is Platform-prod's "HPA at max replicas" for `aauti-marketplace` (expected, see the table);
-everything else is normal. No `-AlertEmails` were passed, so no one is notified until
-`./grafana/deploy.ps1 -AlertEmails ... -SmtpUser ...` is run once. Until then Grafana falls back to its built-in policy and
+everything else is normal. No one is notified yet: the email settings below (recipient `ops@aauti.com`, sender
+`info@aauti.com`, configured in `grafana/deploy.ps1` on 2026-10-15) take effect at the next `./grafana/deploy.ps1` run with
+`$env:SMTP_PASSWORD` set. Until then Grafana falls back to its built-in policy and
 contact point `grafana-default-email` (`<example@email.com>`); with no SMTP login Outlook refuses it, so the Grafana log shows
 "Notify for alerts failed … 530 5.7.57 Client not authenticated" for every firing alert (harmless). `deploy.ps1` refuses
 `-SmtpUser` without `-AlertEmails` (since 2026-10-13), so that fallback can never actually send mail.
-All prod and nonprod alerts share one notification policy (contact point `email-nonprod`); give prod its own contact point
-before turning email on.
+All prod and nonprod alerts share one notification policy (contact point `email-nonprod`) and go to the same recipients
+(chosen on 2026-10-15); a separate prod list would need its own contact point.
 
 | Group | File | Rules |
 |---|---|---|
@@ -170,11 +178,12 @@ before turning email on.
   mailbox and its password live only in Secret `grafana-smtp` (env `GF_SMTP_USER` / `GF_SMTP_PASSWORD` /
   `GF_SMTP_FROM_ADDRESS`). The mailbox needs **SMTP AUTH enabled in Microsoft 365**; if the tenant blocks it,
   change `smtp.host` to an SMTP relay on port 587 (GCP blocks outbound port 25).
-- Recipients, mailbox and password are never stored in the repo. Pass them once with
-  `./grafana/deploy.ps1 -AlertEmails "a@aauti.com;b@aauti.com" -SmtpUser alerts@aauti.com` (it prompts for the
-  password; or `$env:ALERT_EMAILS` / `SMTP_USER` / `SMTP_PASSWORD`); later runs keep the stored values.
+- Recipients and mailbox are defaults in `grafana/deploy.ps1`: `ops@aauti.com` and `info@aauti.com` (override with
+  `-AlertEmails "a@aauti.com;b@aauti.com"` / `-SmtpUser …`, or `$env:ALERT_EMAILS` / `SMTP_USER`). The mailbox password is
+  **never** in the repo: set `$env:SMTP_PASSWORD` (or type it at the prompt) for the first run and after it changes; later
+  runs reuse the copy stored in Secret `grafana-smtp`.
   Grafana restarts (~1 min) whenever the recipients or the SMTP login are created or changed, since the SMTP
-  login is only read at start-up. A different `-SmtpUser` than the stored one always prompts for its password.
+  login is only read at start-up. A different `-SmtpUser` than the stored one always needs its password again.
 - The *Alert rules* page shows a red "Errors loading rules … 404 from rule state endpoint. Perhaps ruler API is not
   enabled?" banner. Expected and harmless: Grafana also asks the `Mimir` datasource for data source-managed rules,
   and Mimir's ruler isn't served through the gateway. All rules here are Grafana-managed. (`manageAlerts: false` on

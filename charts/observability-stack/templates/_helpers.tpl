@@ -91,6 +91,10 @@ https://{{ include "obs.gatewayName" . }}.{{ .Release.Namespace }}.svc:{{ .Value
 {{- $rpw := ternary (index $existingData $rid | default "" | b64dec) (randAlphaNum 32) (hasKey $existingData $rid) -}}
 {{- $_ := set $out $rid $rpw -}}
 {{- end -}}
+{{- range .Values.gateway.extraReaders -}}
+{{- $xpw := ternary (index $existingData .username | default "" | b64dec) (randAlphaNum 32) (hasKey $existingData .username) -}}
+{{- $_ := set $out .username $xpw -}}
+{{- end -}}
 {{- $_ := set .Values._cache "tenantPasswords" $out -}}
 {{- end -}}
 {{- .Values._cache.tenantPasswords | toJson -}}

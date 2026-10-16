@@ -1,19 +1,22 @@
 # Deploys standalone Grafana to aauti-hub-as1-obs-gke at https://grafana.aauti.ai
 # Usage: ./deploy.ps1
+#          (first time, or after the mailbox password changed: $env:SMTP_PASSWORD = '...' first,
+#           or type it at the prompt; later runs reuse the stored password)
 #        ./deploy.ps1 -AlertEmails "a@aauti.com;b@aauti.com" -SmtpUser alerts@aauti.com
-#          (first time, or to change recipients / sender; prompts for the SMTP password)
+#          (other recipients / sender than the defaults below)
 param(
   [string] $Project = "aauti-hub",
   [string] $Cluster = "aauti-hub-as1-obs-gke",
   [string] $Zone = "asia-south1-a",
   [string] $Namespace = "grafana",
-  # Recipients of non-prod alert emails (Outlook), ";"-separated. Kept only in
-  # Secret grafana-alerting-notify; empty = keep the list already stored there.
-  [string] $AlertEmails = $env:ALERT_EMAILS,
+  # Recipients of all alert emails (prod and nonprod), ";"-separated.
+  # Default ops@aauti.com; -AlertEmails or $env:ALERT_EMAILS overrides it.
+  [string] $AlertEmails = $(if ($env:ALERT_EMAILS) { $env:ALERT_EMAILS } else { "ops@aauti.com" }),
   # Mailbox Grafana sends from (SMTP login and From address; host is
-  # grafana.ini smtp.host in values.yaml). Kept only in Secret grafana-smtp;
-  # empty = keep what is stored there.
-  [string] $SmtpUser = $env:SMTP_USER,
+  # grafana.ini smtp.host in values.yaml). Default info@aauti.com.
+  [string] $SmtpUser = $(if ($env:SMTP_USER) { $env:SMTP_USER } else { "info@aauti.com" }),
+  # Never in the repo: $env:SMTP_PASSWORD, the prompt, or the copy already
+  # stored in Secret grafana-smtp (reused for the same mailbox).
   [string] $SmtpPassword = $env:SMTP_PASSWORD
 )
 $ErrorActionPreference = "Stop"
@@ -36,9 +39,10 @@ if ($LASTEXITCODE -ne 0) {
   kubectl --context $ctx -n $Namespace create secret generic grafana-admin --from-literal=admin-user=admin --from-literal=admin-password=$pw
 }
 
-# Gateway users whose password the datasources need: only the read-only
-# federated user of the "Loki" / "Mimir" datasources (all tenants).
-$tenants = @("grafana-reader")
+# Gateway users whose password the datasources need: the read-only federated
+# users of "Loki" / "Mimir" (all tenants) and of the per-tier pairs
+# ("Loki – Prod" / "Mimir – Prod", "Loki – Nonprod" / "Mimir – Nonprod").
+$tenants = @("grafana-reader", "grafana-reader-prod", "grafana-reader-nonprod")
 
 # Datasource credentials: copy the reader password + the gateway CA from the
 # observability namespace (Secrets can't be read across namespaces). Re-running
@@ -173,6 +177,7 @@ if ($SmtpUser -and -not $AlertEmails) { throw "-SmtpUser needs -AlertEmails: wit
 # Reuse the stored password only for the same mailbox; a new mailbox prompts below.
 if ($SmtpUser -and -not $SmtpPassword -and $SmtpUser -eq $storedSmtpUser) { $SmtpPassword = & $stored grafana-smtp password }
 if ($SmtpUser -and -not $SmtpPassword) {
+  if (-not [Environment]::UserInteractive) { throw "No SMTP password for $SmtpUser stored yet: set `$env:SMTP_PASSWORD and re-run" }
   $sec = Read-Host "SMTP password for $SmtpUser" -AsSecureString
   $SmtpPassword = [Net.NetworkCredential]::new("", $sec).Password
 }

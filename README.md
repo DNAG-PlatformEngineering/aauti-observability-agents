@@ -29,7 +29,8 @@ environment, qa and demo included, 7 days). Tenants are per product and tier:
 `<product>-nonprod` (`media-nonprod`, `platform-nonprod`, `jitsi-nonprod`) and `<product>-prod` (`media-prod`, `jitsi-prod`, `platform-prod`), because Mimir
 has only one metrics retention per tenant. The hub monitors itself as `aauti-hub`. Per-tenant values: [hub README](clusters/aauti-hub-as1-obs-gke/README.md).
 
-**Explore in Grafana** (https://grafana.aauti.ai): one `Loki` and one `Mimir` datasource (the default) read all tenants at once. Filter with labels:
+**Explore in Grafana** (https://grafana.aauti.ai): one `Loki` and one `Mimir` datasource (the default) read all tenants at once; `Loki – Prod` / `Mimir – Prod` and
+`Loki – Nonprod` / `Mimir – Nonprod` read only that tier's tenants (enforced by the gateway). Filter with labels:
 
 ```
 product     media | jitsi | platform | aauti-hub
@@ -47,8 +48,9 @@ before it; panels: log volume, log levels, logs, CPU / memory by pod, restarts, 
 **Alerts:** Grafana-managed rules as code in [`grafana/alerting/`](clusters/aauti-hub-as1-obs-gke/grafana/alerting/),
 one file per cluster plus one for the hub's own volumes, sent by email (Outlook SMTP). All 6 clusters and the hub are
 deployed (Media-nonprod 2026-10-08, the rest 2026-10-12; 85 rules). No recipients
-are set, so no one is notified yet (Grafana's built-in fallback contact point fails harmlessly; see the hub README); set them with `grafana/deploy.ps1 -AlertEmails ...`, after giving prod its own contact point
-(today one policy, `email-nonprod`, covers everything). To see them: dashboard **Alerts overview** (folder *Alerts*, next to the rules,
+are deployed yet, so no one is notified (Grafana's built-in fallback contact point fails harmlessly; see the hub README).
+Configured in `grafana/deploy.ps1` (2026-10-15): all alerts, prod and nonprod, to `ops@aauti.com`, sent from `info@aauti.com`;
+the mailbox password is passed at deploy time (`$env:SMTP_PASSWORD`), never stored in the repo. To see them: dashboard **Alerts overview** (folder *Alerts*, next to the rules,
 [source](clusters/aauti-hub-as1-obs-gke/grafana/dashboards/alerts/alerts-overview.json)), counts and firing / pending alerts split
 into prod, nonprod and hub, with filters Tier → Cluster → Environment → Namespace → Severity (keep Environment / Namespace on *All* to
 also see node, agent and hub alerts). Rules, status and setup: [hub README → Alerts](clusters/aauti-hub-as1-obs-gke/README.md#alerts).

@@ -144,6 +144,66 @@ datasources:
         secureJsonData:
           basicAuthPassword: $__file{/etc/grafana/hub/grafana-reader}
           tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+      # Per tier: same gateway, read-only users pinned to the prod or the
+      # nonprod tenants only (gateway.extraReaders in ../observability/values.yaml).
+      - name: Loki – Prod
+        uid: loki-prod
+        type: loki
+        access: proxy
+        url: https://observability-gateway.observability.svc:443
+        basicAuth: true
+        basicAuthUser: grafana-reader-prod
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          maxLines: 1000
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/grafana-reader-prod}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+      - name: Mimir – Prod
+        uid: mimir-prod
+        type: prometheus
+        access: proxy
+        url: https://observability-gateway.observability.svc:443/prometheus
+        basicAuth: true
+        basicAuthUser: grafana-reader-prod
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          prometheusType: Mimir
+          timeInterval: 60s
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/grafana-reader-prod}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+      - name: Loki – Nonprod
+        uid: loki-nonprod
+        type: loki
+        access: proxy
+        url: https://observability-gateway.observability.svc:443
+        basicAuth: true
+        basicAuthUser: grafana-reader-nonprod
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          maxLines: 1000
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/grafana-reader-nonprod}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
+      - name: Mimir – Nonprod
+        uid: mimir-nonprod
+        type: prometheus
+        access: proxy
+        url: https://observability-gateway.observability.svc:443/prometheus
+        basicAuth: true
+        basicAuthUser: grafana-reader-nonprod
+        editable: false
+        jsonData:
+          tlsAuthWithCACert: true
+          prometheusType: Mimir
+          timeInterval: 60s
+        secureJsonData:
+          basicAuthPassword: $__file{/etc/grafana/hub/grafana-reader-nonprod}
+          tlsCACert: $__file{/etc/grafana/hub/ca.crt}
 
 # Dashboards as code: one provider + folder per tenant. deploy.ps1 renders the
 # ConfigMap grafana-dashboards-<tenant> from charts/observability-stack/dashboards
