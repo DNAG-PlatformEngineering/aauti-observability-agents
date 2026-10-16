@@ -15,7 +15,7 @@
 | Agent namespace / Helm release | `observability-agent-jitsiprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-jitsi-prod-gke`, `tier=prod`, `product=jitsi`, `environment=prod` / `env=prod` (everything), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs) |
 | Retention | logs and metrics 30d (tenant `jitsi-prod`) |
-| Status | **Deployed** 2026-10-06 (network, hub, Grafana and agent; all `verify.ps1` checks pass). Alert rules ([jitsi-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/jitsi-prod.yaml), 14 rules) deployed 2026-10-12; no recipients yet, so nothing is sent. |
+| Status | **Deployed** 2026-10-06 (network, hub, Grafana and agent; all `verify.ps1` checks pass). Alert rules ([jitsi-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/jitsi-prod.yaml), 14 rules) deployed 2026-10-12; emailed to `ops@aauti.com` since 2026-10-16. |
 
 ## Differences from jitsi-nonprod
 

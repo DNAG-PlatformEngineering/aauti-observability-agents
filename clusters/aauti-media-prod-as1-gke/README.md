@@ -16,7 +16,7 @@ First **prod spoke** of the hub observability stack, onboarded like
 | Agent namespace / Helm release | `observability-agent-mediaprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-media-prod-as1-gke`, `tier=prod`, `product=media`, `environment=prod` (single-environment cluster, so every namespace and the nodes), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). `env` = same value as `environment` (since 2026-10-06) |
 | Retention | logs and metrics 30d (tenant `media-prod`) |
-| Status | **Deployed** 2026-10-06 (hub, Grafana and agent; all `verify.ps1` checks pass). Grafana folder **Media-prod**. Alert rules ([media-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/media-prod.yaml), 14 rules) deployed 2026-10-12; no recipients yet, so nothing is sent. On first start the agent replays pod logs from before Loki's 7-day reject window; Loki rejects those (HTTP 400 "timestamp too old") for ~2 minutes; `verify.ps1` passes once they leave its 10-minute window (~12 minutes after install). |
+| Status | **Deployed** 2026-10-06 (hub, Grafana and agent; all `verify.ps1` checks pass). Grafana folder **Media-prod**. Alert rules ([media-prod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/media-prod.yaml), 14 rules) deployed 2026-10-12; emailed to `ops@aauti.com` since 2026-10-16. On first start the agent replays pod logs from before Loki's 7-day reject window; Loki rejects those (HTTP 400 "timestamp too old") for ~2 minutes; `verify.ps1` passes once they leave its 10-minute window (~12 minutes after install). |
 
 ## Differences from media-nonprod
 
@@ -58,7 +58,7 @@ gcloud container clusters get-credentials aauti-media-prod-as1-gke --region asia
 ./clusters/aauti-hub-as1-obs-gke/observability/deploy.ps1
 
 # 2. Hub Grafana: Media-prod dashboards (Grafana pod restarts once).
-#    It also deploys the email alerting + SMTP (deployed 2026-10-08, no recipients yet; see the hub README, Alerts).
+#    It also deploys the email alerting + SMTP (email to `ops@aauti.com` since 2026-10-16; see the hub README, Alerts).
 ./clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1
 
 # 3. Spoke: agent in the new namespace observability-agent-mediaprod.

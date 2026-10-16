@@ -30,10 +30,13 @@
   onboarding, so it's resent and rejected each time. No current logs are lost; Loki accepts the rest of each push.
   Because of this a spoke's `verify.ps1` can fail its gateway status-code check with a few 400s at any time (seen on
   both Jitsi clusters on 2026-10-13); harmless when the agent log gives "timestamp too old" as the reason.
-- **MinIO users:** only the root credentials from Secret `observability-object-storage`. The chart sets `minio.users: []`
-  (since 2026-10-13; the MinIO sub-chart's default had created a `console` / `console123` user with `consoleAdmin`).
-  After deploying that, remove the existing user once with `mc admin user remove <alias> console` in the MinIO pod;
-  changing values doesn't delete it.
+- **MinIO users:** only the root credentials from Secret `observability-object-storage` (used by Loki, Mimir and the
+  bucket Job). The chart sets `minio.users: []` (since 2026-10-13): the MinIO sub-chart's default had created a
+  `console` / `console123` user with `consoleAdmin`, removed by hand on 2026-10-16 (`mc admin user remove`, from a temporary
+  `pgsty/mc` pod: the MinIO image has no `mc`). `mc admin user list` is now empty.
+- **MinIO updates:** `deploymentUpdate: Recreate` (since 2026-10-13). Its 50Gi PVC is ReadWriteOnce, so the sub-chart's
+  RollingUpdate deadlocked (the new pod can't attach the disk while the old one holds it). Any MinIO pod change now means
+  ~1-2 minutes without object storage: Loki / Mimir retry writes, queries over older data may fail meanwhile.
 - **Gateway CPU:** requests 500m (`gateway.resources` in `observability/values.yaml`, since 2026-10-13; chart default
   50m). It used ~0.5 core with 6 spokes: nginx checks the bcrypt basic-auth hash on every push and query.
   The chart's Service is ClusterIP (used by Grafana); spokes come in through the internal LB below.
@@ -74,7 +77,7 @@
   (`aauti-hub|jitsi-nonprod|jitsi-prod|media-nonprod|media-prod|platform-nonprod|platform-prod`, Loki `multi_tenant_queries_enabled`, Mimir
   `tenant_federation`) and returns 403 if it tries to push. Results carry `__tenant_id__`; filter with `product` / `env` /
   `cluster` / `namespace` / `app` / `pod` / `container`. A new tenant is included automatically after `observability/deploy.ps1`.
-- **Grafana datasources per tier** (added 2026-10-15): `Loki – Prod` / `Mimir – Prod` (uids `loki-prod` / `mimir-prod`) read only
+- **Grafana datasources per tier** (deployed 2026-10-16; checked: each sees only its tier's three tenants): `Loki – Prod` / `Mimir – Prod` (uids `loki-prod` / `mimir-prod`) read only
   `jitsi-prod|media-prod|platform-prod`, as read-only user `grafana-reader-prod`; `Loki – Nonprod` / `Mimir – Nonprod`
   (`loki-nonprod` / `mimir-nonprod`) read only `jitsi-nonprod|media-nonprod|platform-nonprod`, as `grafana-reader-nonprod`.
   The gateway pins them (`gateway.extraReaders` in `observability/values.yaml`), so even a query without filters can't see the
@@ -149,16 +152,16 @@ The panels follow *Tier*: each Summary / Needs-attention panel repeats once per 
 clicking a cluster name opens its Cluster health, Workloads & logs, Resource usage, all its dashboards (incl. Jitsi Meet) or
 its alert rules, with that cluster selected. The hub's rules and Explore view are linked under the table.
 
-**Status (2026-10-12):** all 7 groups are deployed (Media-nonprod since 2026-10-08, the rest 2026-10-12): 85 rules,
+**Status (2026-10-16):** all 7 groups are deployed (Media-nonprod since 2026-10-08, the rest 2026-10-12): 85 rules,
 all healthy. The only alert is Platform-prod's "HPA at max replicas" for `aauti-marketplace` (expected, see the table);
-everything else is normal. No one is notified yet: the email settings below (recipient `ops@aauti.com`, sender
-`info@aauti.com`, configured in `grafana/deploy.ps1` on 2026-10-15) take effect at the next `./grafana/deploy.ps1` run with
-`$env:SMTP_PASSWORD` set. Until then Grafana falls back to its built-in policy and
-contact point `grafana-default-email` (`<example@email.com>`); with no SMTP login Outlook refuses it, so the Grafana log shows
-"Notify for alerts failed … 530 5.7.57 Client not authenticated" for every firing alert (harmless). `deploy.ps1` refuses
-`-SmtpUser` without `-AlertEmails` (since 2026-10-13), so that fallback can never actually send mail.
+everything else is normal. **Email is live since 2026-10-16:** every alert, prod and nonprod, goes to `ops@aauti.com`,
+sent from `info@aauti.com` (Grafana Helm revision 31). The first send (the marketplace HPA alert, 06:13 UTC) was accepted
+by Office 365 with no error (Alerting → Contact points → `email-nonprod` shows the last delivery attempt); arrival in the
+inbox not yet confirmed. It repeats every 4h while the alert fires.
 All prod and nonprod alerts share one notification policy (contact point `email-nonprod`) and go to the same recipients
-(chosen on 2026-10-15); a separate prod list would need its own contact point.
+(chosen on 2026-10-15); a separate prod list would need its own contact point. Grafana's built-in contact point
+`grafana-default-email` (`<example@email.com>`) still exists but nothing routes to it; `deploy.ps1` refuses `-SmtpUser`
+without recipients (since 2026-10-13), so it can't become the fallback again.
 
 | Group | File | Rules |
 |---|---|---|
@@ -188,7 +191,7 @@ All prod and nonprod alerts share one notification policy (contact point `email-
   enabled?" banner. Expected and harmless: Grafana also asks the `Mimir` datasource for data source-managed rules,
   and Mimir's ruler isn't served through the gateway. All rules here are Grafana-managed. (`manageAlerts: false` on
   the datasources would hide it; deliberately not set.)
-  Without recipients the rules still load but no one is notified (see Status above).
+  Without recipients the rules would still load but no one would be notified.
 - Provisioned rules are read-only in the UI. To add a cluster, copy `media-nonprod.yaml` and change the
   `cluster` matcher, group name, `uid` prefix, the `tenant` label on every rule, the namespace filter of the
   error-log rule (`aauti-media-.+`), and the agent namespace / GCP project named in the descriptions

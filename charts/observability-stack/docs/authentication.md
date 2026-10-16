@@ -5,10 +5,12 @@
 > which is disabled on the hub. The standalone Grafana (`clusters/aauti-hub-as1-obs-gke/grafana/`)
 > has one `Loki` and one `Mimir` datasource that log in as the read-only federated user
 > `grafana-reader` (`gateway.reader`): the gateway sets its `X-Scope-OrgID` to every tenant and
-> returns 403 on pushes. Its password and the CA come from Secret `grafana-hub-datasource`; the
+> returns 403 on pushes. The per-tier pairs (`Loki – Prod` / `Mimir – Prod`, `Loki – Nonprod` /
+> `Mimir – Nonprod`) log in as `grafana-reader-prod` / `grafana-reader-nonprod` (`gateway.extraReaders`),
+> pinned to that tier's tenants, also read-only. Their passwords and the CA come from Secret `grafana-hub-datasource`; the
 > admin login is Secret `grafana-admin` in namespace `grafana`. `grafanaAccess` is off, so there
 > are no tenant teams/orgs: any Viewer can read every tenant. The tenant binding below applies to
-> every user except `grafana-reader`.
+> every user except the `grafana-reader*` users.
 
 ## 1. Spoke → hub: TLS + per-tenant basic auth
 
@@ -57,9 +59,9 @@ kubectl -n observability get secret observability-hub-ca -o jsonpath='{.data.ca\
    `kubectl -n observability-agent-jitsinonprod rollout restart statefulset/observability-agent-jitsinonprod-alloy`.
    The cluster's `observability-agent/deploy.ps1` does both (it re-copies the password from the hub).
 3. Grafana picks the new password up from the mounted Secret after its
-   datasources reload (restart Grafana to force it). In this repo Grafana only uses `grafana-reader`, so a
-   tenant rotation doesn't touch it. After rotating `grafana-reader`, re-run
-   `clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1`: it copies the password into Secret
+   datasources reload (restart Grafana to force it). In this repo Grafana only uses the `grafana-reader*` users, so a
+   tenant rotation doesn't touch it. After rotating any of them, re-run
+   `clusters/aauti-hub-as1-obs-gke/grafana/deploy.ps1`: it copies the passwords into Secret
    `grafana-hub-datasource` (namespace `grafana`).
 
 To rotate by regeneration instead, delete the key from

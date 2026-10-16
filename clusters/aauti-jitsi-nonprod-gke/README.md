@@ -10,7 +10,7 @@ clusters are onboarded the same way (see [Standard](#standard-for-the-next-clust
 | VPC | `aauti-jitsi-nonprod-vpc`: nodes 10.16.0.0/24, pods 10.17.0.0/17, services 10.18.0.0/22 |
 | Hub | `aauti-hub-as1-obs-gke`, tenant **`jitsi-nonprod`** (was `jitsi` until 2026-10-06), Grafana https://grafana.aauti.ai (folder **Jitsi-nonprod**) |
 | Labels on all data | `cluster=aauti-jitsi-nonprod-gke`, `tier=nonprod`, `product=jitsi`, `environment`, `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). **environment:** one Jitsi (`devvideo.aauti.com`) serves **dev, qa, demo and sandbox**, chosen per meeting by the room name (`<title>-<id>-aauti-<env>`, recordings `…-recording-<env>`). Infrastructure (pods, nodes, JVB load, all metrics) = `shared`. Log lines naming a room (web, prosody, jicofo, jvb, jibri `[finalize][<env>]`) = that meeting's env. `env` = same value as `environment` (since 2026-10-06) |
-| Status | **Deployed** 2026-09-30. Grafana folder **Jitsi-nonprod**. Alert rules ([jitsi-nonprod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/jitsi-nonprod.yaml), 14 rules) deployed 2026-10-12; no recipients yet, so nothing is sent. |
+| Status | **Deployed** 2026-09-30. Grafana folder **Jitsi-nonprod**. Alert rules ([jitsi-nonprod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/jitsi-nonprod.yaml), 14 rules) deployed 2026-10-12; emailed to `ops@aauti.com` since 2026-10-16. |
 | Agent namespace / Helm release | `observability-agent-jitsinonprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. Renamed from `observability-agent` on 2026-10-01. |
 
 ## What gets deployed
@@ -44,7 +44,7 @@ Jitsi release are **not modified**. The agent only *reads*:
 | Private only | The agent's only destination is `https://10.40.16.10` (RFC 1918). That IP belongs to an **internal** passthrough LB in the hub VPC, reachable only over the peering `jitsi-nonprod-to-hub` ⇄ `hub-to-jitsi-nonprod`. There's no public IP, public DNS or internet path. The LB's firewall rule (created by GKE) only allows the peered spokes' node and pod ranges listed in `gateway-internal-lb.yaml` (this cluster: `10.16.0.0/24`, `10.17.0.0/17`). |
 | TLS | Gateway listens only on TLS (8443 → LB 443, TLSv1.2/1.3). The agent verifies the certificate against the hub's private CA (`ca_file`) with `server_name = observability-gateway.observability.svc`. `insecure_skip_verify` is off. |
 | Authentication | Basic auth per tenant (`jitsi-nonprod`, bcrypt htpasswd on the gateway). The gateway derives `X-Scope-OrgID` from the user and returns 403 on a mismatch, so this cluster can only write or read tenant `jitsi-nonprod`. The password lives only in Secrets: hub `observability-tenant-credentials`, spoke `observability-agent-jitsinonprod-auth`. |
-| Least privilege | Agent RBAC is read-only (get/list/watch; pods/log; nodes/metrics). The agent's credential can only write tenant `jitsi-nonprod`. Grafana reads through the federated read-only user `grafana-reader` (all tenants, pushes get 403). |
+| Least privilege | Agent RBAC is read-only (get/list/watch; pods/log; nodes/metrics). The agent's credential can only write tenant `jitsi-nonprod`. Grafana reads through read-only users: `grafana-reader` (all tenants) and `grafana-reader-nonprod` (the three nonprod tenants, for `Loki – Nonprod` / `Mimir – Nonprod`); pushes get 403. |
 
 ## Files
 

@@ -47,10 +47,9 @@ before it; panels: log volume, log levels, logs, CPU / memory by pod, restarts, 
 
 **Alerts:** Grafana-managed rules as code in [`grafana/alerting/`](clusters/aauti-hub-as1-obs-gke/grafana/alerting/),
 one file per cluster plus one for the hub's own volumes, sent by email (Outlook SMTP). All 6 clusters and the hub are
-deployed (Media-nonprod 2026-10-08, the rest 2026-10-12; 85 rules). No recipients
-are deployed yet, so no one is notified (Grafana's built-in fallback contact point fails harmlessly; see the hub README).
-Configured in `grafana/deploy.ps1` (2026-10-15): all alerts, prod and nonprod, to `ops@aauti.com`, sent from `info@aauti.com`;
-the mailbox password is passed at deploy time (`$env:SMTP_PASSWORD`), never stored in the repo. To see them: dashboard **Alerts overview** (folder *Alerts*, next to the rules,
+deployed (Media-nonprod 2026-10-08, the rest 2026-10-12; 85 rules). **Email is live since 2026-10-16:** all alerts,
+prod and nonprod, go to `ops@aauti.com`, sent from `info@aauti.com` (defaults in `grafana/deploy.ps1`); the mailbox
+password is passed at deploy time (`$env:SMTP_PASSWORD`) and kept only in Secret `grafana-smtp`, never in the repo. To see them: dashboard **Alerts overview** (folder *Alerts*, next to the rules,
 [source](clusters/aauti-hub-as1-obs-gke/grafana/dashboards/alerts/alerts-overview.json)), counts and firing / pending alerts split
 into prod, nonprod and hub, with filters Tier → Cluster → Environment → Namespace → Severity (keep Environment / Namespace on *All* to
 also see node, agent and hub alerts). Rules, status and setup: [hub README → Alerts](clusters/aauti-hub-as1-obs-gke/README.md#alerts).
@@ -70,7 +69,11 @@ with its sub-charts vendored. Changes, all opt-in (defaults render as before):
 - `gateway.reader`: a read-only gateway user pinned to all tenants (Loki / Mimir tenant federation) for Grafana's
   single `Loki` / `Mimir` datasources; push returns 403 for it.
 - Tenant-usage alert summaries escape `$labels` / `$values` as `$$` (Grafana interpolates env vars in provisioned files).
-- `minio.users: []` (not opt-in): the MinIO sub-chart no longer creates its default `console` / `console123` admin user.
+- `minio.users: []` (not opt-in): the MinIO sub-chart no longer creates its default `console` / `console123` admin user
+  (the hub's existing one was removed on 2026-10-16). `minio.deploymentUpdate: Recreate` (not opt-in): its single
+  ReadWriteOnce PVC deadlocked the sub-chart's RollingUpdate.
+- `gateway.extraReaders`: more read-only users, each pinned to a list of tenants (the hub's `grafana-reader-prod` /
+  `grafana-reader-nonprod` behind the per-tier Grafana datasources).
 - Dashboards: *Containers not ready* ignores finished (Succeeded) pods, and *Warning events* follows the Environment /
   Namespace filters. k6's failure-rate threshold covers only the real endpoints, not the deliberate `/api/error` calls.
 - Annotated-pod scraping: GKE kube-dns 36+ (GKE 1.36) is scraped on 9153 (`coredns_*`) instead of its annotated

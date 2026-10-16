@@ -14,7 +14,7 @@ Second **spoke** of the hub observability stack, onboarded like
 | Workloads | `aauti-media-{api,dashboard,delivery,upload}-{dev,qa,demo,sandbox}`, `aauti-media-events`, `media-gateway` |
 | Agent namespace / Helm release | `observability-agent-medianonprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-media-nonprod-as1-gke`, `tier=nonprod`, `product=media`, `environment` (namespace suffix dev/qa/demo/sandbox, else `shared`), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). `env` = same value as `environment` (since 2026-10-06) |
-| Status | **Deployed** 2026-10-01 (hub, Grafana and agent; all `verify.ps1` checks pass). Grafana folder **Media-nonprod**. Alert rules ([media-nonprod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/media-nonprod.yaml), 14 rules) deployed 2026-10-08, but no recipients are set yet, so nothing is sent. |
+| Status | **Deployed** 2026-10-01 (hub, Grafana and agent; all `verify.ps1` checks pass). Grafana folder **Media-nonprod**. Alert rules ([media-nonprod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/media-nonprod.yaml), 14 rules) deployed 2026-10-08; emailed to `ops@aauti.com` since 2026-10-16. |
 
 ## Differences from jitsi-nonprod
 

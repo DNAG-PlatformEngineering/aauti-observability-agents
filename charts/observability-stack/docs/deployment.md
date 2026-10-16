@@ -6,7 +6,7 @@
 > `observability-agent-<product><tier>` (e.g. `observability-agent-medianonprod`), not `observability-agent`.
 > The *Production (GKE + GCS)* steps aren't done yet: the hub uses MinIO, single replicas, RF 1.
 > In the table below, read tenant `aauti-hub` for both `platform` and `loadtest` (`k6.tenant: aauti-hub`),
-> and Grafana is standalone with one federated `Loki` / `Mimir` datasource pair, not per-tenant ones.
+> and Grafana is standalone with one federated `Loki` / `Mimir` datasource pair (plus a prod and a nonprod pair), not per-tenant ones.
 > There is no CI here (`scripts/ci-check.sh` and `.github/` are POC-only), and the sub-charts are committed
 > in `charts/`, so `helm dependency build` isn't needed.
 

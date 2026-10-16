@@ -17,7 +17,7 @@ reference setup [aauti-jitsi-nonprod-gke](../aauti-jitsi-nonprod-gke/README.md))
 | Agent namespace / Helm release | `observability-agent-platformnonprod` (both). Every agent object carries that prefix: `-alloy`, `-kube-state-metrics`, `-config`, `-auth`, `-hub-ca`. |
 | Labels on all data | `cluster=aauti-platform-nonprod-as1-gke`, `tier=nonprod`, `product=platform`, `environment` (namespace suffix dev/qa/demo/sandbox, else `shared`), `namespace`, `pod`, `container`, `node`, `app`, `job` (+ `log_type` on logs). `env` = same value as `environment` (since 2026-10-06) |
 | Retention | logs: dev, sandbox, shared 7d; qa, demo 10d. Metrics: 10d (one retention per tenant in Mimir) |
-| Status | **Deployed** 2026-10-01 (hub, Grafana and agent). Grafana folder **Platform-nonprod**. Alert rules ([platform-nonprod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/platform-nonprod.yaml), 13 rules: no "HPA at max", since 19 of the 44 nonprod HPAs sit at max permanently) deployed 2026-10-12; no recipients yet, so nothing is sent. |
+| Status | **Deployed** 2026-10-01 (hub, Grafana and agent). Grafana folder **Platform-nonprod**. Alert rules ([platform-nonprod.yaml](../aauti-hub-as1-obs-gke/grafana/alerting/platform-nonprod.yaml), 13 rules: no "HPA at max", since 19 of the 44 nonprod HPAs sit at max permanently) deployed 2026-10-12; emailed to `ops@aauti.com` since 2026-10-16. |
 
 ## Differences from media-nonprod-as1
 
